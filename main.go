@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"log"
 	"net"
@@ -31,13 +30,6 @@ func main() {
 // OR Trigger:or_update
 func run() error {
 
-	var conninfo string = ""
-
-	db, err := sql.Open("postgres", conninfo)
-	if err != nil {
-		panic(err)
-	}
-
 	if len(os.Args) < 2 {
 		return errors.New("please provide an address to listen on as the first argument")
 	}
@@ -47,7 +39,7 @@ func run() error {
 		return err
 	}
 	log.Printf("listening on ws://%v", l.Addr())
-	dbs := newDBServer(db)
+	dbs := newDBServer()
 	s := &http.Server{
 		Handler:      dbs,
 		ReadTimeout:  time.Second * 10,

@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
+	"pitchlake-backend/db"
 	"sync"
 	"time"
 
@@ -22,7 +23,7 @@ type dbServer struct {
 	//
 	// Defaults to 16.
 	subscriberMessageBuffer int
-	db                      *sql.DB
+	db                      *db.DB
 
 	// publishLimiter controls the rate limit applied to the publish endpoint.
 	//
@@ -40,7 +41,11 @@ type dbServer struct {
 }
 
 // newdbServer constructs a dbServer with the defaults.
-func newDBServer(db *sql.DB) *dbServer {
+func newDBServer() *dbServer {
+
+	db := &db.DB{}
+	connString := ""
+	db.Init(connString)
 	dbs := &dbServer{
 		subscriberMessageBuffer: 16,
 		logf:                    log.Printf,
@@ -154,6 +159,45 @@ func (dbs *dbServer) subscribe(ctx context.Context, w http.ResponseWriter, r *ht
 		case <-ctx.Done():
 			return ctx.Err()
 		}
+	}
+}
+
+func (dbs *dbServer) listener() {
+	_, err := dbs.db.Conn.Exec(context.Background(), "LISTEN lp_row_update")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = dbs.db.Conn.Exec(context.Background(), "LISTEN vault_update")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = dbs.db.Conn.Exec(context.Background(), "LISTEN state_transition")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = dbs.db.Conn.Exec(context.Background(), "LISTEN ob_update")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = dbs.db.Conn.Exec(context.Background(), "LISTEN or_update")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Waiting for notifications...")
+
+	for {
+		// Wait for a notification
+		notification, err := dbs.db.Conn.WaitForNotification(context.Background())
+		if err != nil {
+			log.Fatal(err)
+		}
+		//Process notification here
+		fmt.Printf("Received notification: %s\n", notification.Payload)
 	}
 }
 

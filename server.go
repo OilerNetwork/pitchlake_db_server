@@ -39,6 +39,16 @@ type dbServer struct {
 	subscribers   map[string]map[*subscriber]struct{}
 }
 
+// subscriber represents a subscriber.
+// Messages are sent on the msgs channel and if the client
+// cannot keep up with the messages, closeSlow is called.
+type subscriber struct {
+	msgs      chan []byte
+	address   string
+	userType  string
+	closeSlow func()
+}
+
 // newdbServer constructs a dbServer with the defaults.
 // Create a custom context for the server here and pass it to the db package
 func newDBServer() *dbServer {
@@ -56,15 +66,6 @@ func newDBServer() *dbServer {
 	dbs.serveMux.HandleFunc("/subscribe", dbs.subscribeHandler)
 	dbs.listener()
 	return dbs
-}
-
-// subscriber represents a subscriber.
-// Messages are sent on the msgs channel and if the client
-// cannot keep up with the messages, closeSlow is called.
-type subscriber struct {
-	msgs      chan []byte
-	address   string
-	closeSlow func()
 }
 
 func (dbs *dbServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -146,7 +147,7 @@ func (dbs *dbServer) subscribe(ctx context.Context, w http.ResponseWriter, r *ht
 }
 
 func (dbs *dbServer) listener() {
-	_, err := dbs.db.Conn.Exec(context.Background(), "LISTEN lp_row_update")
+	_, err := dbs.db.Conn.Exec(context.Background(), "LISTEN lp_update")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -180,13 +181,26 @@ func (dbs *dbServer) listener() {
 			log.Fatal(err)
 		}
 		//Process notification here
-		dbs.publishUser(notification.Channel, []byte(notification.Payload))
+		switch notification.Channel {
+		case "lp_update":
+			fmt.Println("Received an update on lp_row_update")
+		case "vault_update":
+			fmt.Println("Received an update on vault_update")
+		case "state_transition":
+			fmt.Println("Received an update on state_transition")
+		case "ob_update":
+			fmt.Println("Received an update on ob_update")
+		case "or_update":
+			fmt.Println("Received an update on or_update")
+
+		}
+		dbs.publishAddress(notification.Channel, []byte(notification.Payload))
 		dbs.publishAll([]byte(notification.Payload))
 	}
 }
 
 // publishUser sends a message to all subscribers of a specific address.
-func (dbs *dbServer) publishUser(address string, msg []byte) {
+func (dbs *dbServer) publishAddress(address string, msg []byte) {
 	dbs.subscribersMu.Lock()
 	defer dbs.subscribersMu.Unlock()
 

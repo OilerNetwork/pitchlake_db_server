@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/http"
@@ -37,10 +36,11 @@ type dbServer struct {
 	serveMux http.ServeMux
 
 	subscribersMu sync.Mutex
-	subscribers   map[string]*subscriber
+	subscribers   map[string]map[*subscriber]struct{}
 }
 
 // newdbServer constructs a dbServer with the defaults.
+// Create a custom context for the server here and pass it to the db package
 func newDBServer() *dbServer {
 
 	db := &db.DB{}
@@ -49,13 +49,12 @@ func newDBServer() *dbServer {
 	dbs := &dbServer{
 		subscriberMessageBuffer: 16,
 		logf:                    log.Printf,
-		subscribers:             make(map[string]*subscriber),
+		subscribers:             make(map[string]map[*subscriber]struct{}),
 		db:                      db,
 	}
 	dbs.serveMux.Handle("/", http.FileServer(http.Dir(".")))
 	dbs.serveMux.HandleFunc("/subscribe", dbs.subscribeHandler)
-	dbs.serveMux.HandleFunc("/publish", dbs.publishHandler)
-
+	dbs.listener()
 	return dbs
 }
 
@@ -91,22 +90,6 @@ func (dbs *dbServer) subscribeHandler(w http.ResponseWriter, r *http.Request) {
 
 // publishHandler reads the request body with a limit of 8192 bytes and then publishes
 // the received message.
-func (dbs *dbServer) publishHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
-		return
-	}
-	body := http.MaxBytesReader(w, r.Body, 8192)
-	msg, err := io.ReadAll(body)
-	if err != nil {
-		http.Error(w, http.StatusText(http.StatusRequestEntityTooLarge), http.StatusRequestEntityTooLarge)
-		return
-	}
-
-	dbs.publish(msg)
-
-	w.WriteHeader(http.StatusAccepted)
-}
 
 // subscribe subscribes the given WebSocket to all broadcast messages.
 // It creates a subscriber with a buffered msgs chan to give some room to slower
@@ -197,18 +180,17 @@ func (dbs *dbServer) listener() {
 			log.Fatal(err)
 		}
 		//Process notification here
-		fmt.Printf("Received notification: %s\n", notification.Payload)
+		dbs.publishUser(notification.Channel, []byte(notification.Payload))
+		dbs.publishAll([]byte(notification.Payload))
 	}
 }
 
-// publish publishes the msg to all subscribers.
-// It never blocks and so messages to slow subscribers
-// are dropped.
-func (dbs *dbServer) publish(msg []byte) {
+// publishUser sends a message to all subscribers of a specific address.
+func (dbs *dbServer) publishUser(address string, msg []byte) {
 	dbs.subscribersMu.Lock()
 	defer dbs.subscribersMu.Unlock()
 
-	for _, s := range dbs.subscribers {
+	for s := range dbs.subscribers[address] {
 		select {
 		case s.msgs <- msg:
 		default:
@@ -217,10 +199,26 @@ func (dbs *dbServer) publish(msg []byte) {
 	}
 }
 
+// publishAll sends a message to all subscribers of all addresses.
+func (dbs *dbServer) publishAll(msg []byte) {
+	dbs.subscribersMu.Lock()
+	defer dbs.subscribersMu.Unlock()
+
+	for address := range dbs.subscribers {
+		for s := range dbs.subscribers[address] {
+			select {
+			case s.msgs <- msg:
+			default:
+				go s.closeSlow()
+			}
+		}
+	}
+}
+
 // addSubscriber registers a subscriber.
 func (dbs *dbServer) addSubscriber(s *subscriber) {
 	dbs.subscribersMu.Lock()
-	dbs.subscribers[s.address] = s
+	dbs.subscribers[s.address][s] = struct{}{}
 	dbs.subscribersMu.Unlock()
 }
 

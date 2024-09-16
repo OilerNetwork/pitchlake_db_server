@@ -36,8 +36,10 @@ type dbServer struct {
 	// serveMux routes the various endpoints to the appropriate handler.
 	serveMux http.ServeMux
 
-	subscribersMu sync.Mutex
-	subscribers   map[string]map[*subscriber]struct{}
+	subscribersVaultMu sync.Mutex
+	subscribersVault   map[string]map[*subscriber]struct{}
+	subscribersHomeMu  sync.Mutex
+	subscribersHome    map[*subscriber]struct{}
 }
 
 // subscriber represents a subscriber.
@@ -66,11 +68,13 @@ func newDBServer() *dbServer {
 	dbs := &dbServer{
 		subscriberMessageBuffer: 16,
 		logf:                    log.Printf,
-		subscribers:             make(map[string]map[*subscriber]struct{}),
+		subscribersVault:        make(map[string]map[*subscriber]struct{}),
+		subscribersHome:         make(map[*subscriber]struct{}),
 		db:                      db,
 	}
 	dbs.serveMux.Handle("/", http.FileServer(http.Dir(".")))
-	dbs.serveMux.HandleFunc("/subscribe", dbs.subscribeHandler)
+	dbs.serveMux.HandleFunc("/subscribeHome", dbs.subscribeHomeHandler)
+	dbs.serveMux.HandleFunc("/subscribeVault", dbs.subscribeVaultHandler)
 	dbs.listener()
 	return dbs
 }
@@ -79,10 +83,25 @@ func (dbs *dbServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	dbs.serveMux.ServeHTTP(w, r)
 }
 
+func (dbs *dbServer) subscribeHomeHandler(w http.ResponseWriter, r *http.Request) {
+	err := dbs.subscribeHome(r.Context(), w, r)
+	if errors.Is(err, context.Canceled) {
+		return
+	}
+	if websocket.CloseStatus(err) == websocket.StatusNormalClosure ||
+		websocket.CloseStatus(err) == websocket.StatusGoingAway {
+		return
+	}
+	if err != nil {
+		dbs.logf("%v", err)
+		return
+	}
+}
+
 // subscribeHandler accepts the WebSocket connection and then subscribes
 // it to all future messages.
-func (dbs *dbServer) subscribeHandler(w http.ResponseWriter, r *http.Request) {
-	err := dbs.subscribe(r.Context(), w, r)
+func (dbs *dbServer) subscribeVaultHandler(w http.ResponseWriter, r *http.Request) {
+	err := dbs.subscribeVault(r.Context(), w, r)
 	if errors.Is(err, context.Canceled) {
 		return
 	}
@@ -107,7 +126,7 @@ func (dbs *dbServer) subscribeHandler(w http.ResponseWriter, r *http.Request) {
 //
 // It uses CloseRead to keep reading from the connection to process control
 // messages and cancel the context if the connection drops.
-func (dbs *dbServer) subscribe(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
 	var mu sync.Mutex
 	var c *websocket.Conn
 	var closed bool
@@ -128,8 +147,59 @@ func (dbs *dbServer) subscribe(ctx context.Context, w http.ResponseWriter, r *ht
 			}
 		},
 	}
-	dbs.addSubscriber(s)
-	defer dbs.deleteSubscriber(s)
+	dbs.addSubscriber(s, "Vault")
+	defer dbs.deleteSubscriber(s, "Vault")
+
+	c2, err := websocket.Accept(w, r, nil)
+	if err != nil {
+		return err
+	}
+	mu.Lock()
+	if closed {
+		mu.Unlock()
+		return net.ErrClosed
+	}
+	c = c2
+	mu.Unlock()
+	defer c.CloseNow()
+
+	ctx = c.CloseRead(ctx)
+	//Send initial payload here
+	writeTimeout(ctx, time.Second*5, c, []byte("subscribed"))
+	for {
+		select {
+		case msg := <-s.msgs:
+			err := writeTimeout(ctx, time.Second*5, c, msg)
+			if err != nil {
+				return err
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+	var mu sync.Mutex
+	var c *websocket.Conn
+	var closed bool
+	//Extract address from the request and add here
+	decoder := json.NewDecoder(r.Body)
+	var sm subscriberMessage
+	decoder.Decode(&sm)
+	s := &subscriber{
+		msgs: make(chan []byte, dbs.subscriberMessageBuffer),
+		closeSlow: func() {
+			mu.Lock()
+			defer mu.Unlock()
+			closed = true
+			if c != nil {
+				c.Close(websocket.StatusPolicyViolation, "connection too slow to keep up with messages")
+			}
+		},
+	}
+	dbs.addSubscriber(s, "Vault")
+	defer dbs.deleteSubscriber(s, "Vault")
 
 	c2, err := websocket.Accept(w, r, nil)
 	if err != nil {
@@ -216,10 +286,10 @@ func (dbs *dbServer) listener() {
 
 // publishUser sends a message to all subscribers of a specific address.
 func (dbs *dbServer) publishAddress(address string, msg []byte) {
-	dbs.subscribersMu.Lock()
-	defer dbs.subscribersMu.Unlock()
+	dbs.subscribersVaultMu.Lock()
+	defer dbs.subscribersVaultMu.Unlock()
 
-	for s := range dbs.subscribers[address] {
+	for s := range dbs.subscribersVault[address] {
 		select {
 		case s.msgs <- msg:
 		default:
@@ -230,11 +300,11 @@ func (dbs *dbServer) publishAddress(address string, msg []byte) {
 
 // publishAll sends a message to all subscribers of all addresses.
 func (dbs *dbServer) publishAll(msg []byte) {
-	dbs.subscribersMu.Lock()
-	defer dbs.subscribersMu.Unlock()
+	dbs.subscribersVaultMu.Lock()
+	defer dbs.subscribersVaultMu.Unlock()
 
-	for address := range dbs.subscribers {
-		for s := range dbs.subscribers[address] {
+	for address := range dbs.subscribersVault {
+		for s := range dbs.subscribersVault[address] {
 			select {
 			case s.msgs <- msg:
 			default:
@@ -245,17 +315,30 @@ func (dbs *dbServer) publishAll(msg []byte) {
 }
 
 // addSubscriber registers a subscriber.
-func (dbs *dbServer) addSubscriber(s *subscriber) {
-	dbs.subscribersMu.Lock()
-	dbs.subscribers[s.address][s] = struct{}{}
-	dbs.subscribersMu.Unlock()
+func (dbs *dbServer) addSubscriber(s *subscriber, subscriptionType string) {
+	if subscriptionType == "Vault" {
+		dbs.subscribersVaultMu.Lock()
+		dbs.subscribersVault[s.address][s] = struct{}{}
+		dbs.subscribersVaultMu.Unlock()
+	} else if subscriptionType == "Home" {
+		dbs.subscribersHomeMu.Lock()
+		dbs.subscribersHome[s] = struct{}{}
+		dbs.subscribersHomeMu.Unlock()
+	}
 }
 
 // deleteSubscriber deletes the given subscriber.
-func (dbs *dbServer) deleteSubscriber(s *subscriber) {
-	dbs.subscribersMu.Lock()
-	delete(dbs.subscribers, s.address)
-	dbs.subscribersMu.Unlock()
+func (dbs *dbServer) deleteSubscriber(s *subscriber, subscriptionType string) {
+	if subscriptionType == "Vault" {
+		dbs.subscribersVaultMu.Lock()
+		delete(dbs.subscribersVault[s.address], s)
+		dbs.subscribersVaultMu.Unlock()
+	} else if subscriptionType == "Home" {
+		dbs.subscribersHomeMu.Lock()
+		delete(dbs.subscribersHome, s)
+		dbs.subscribersHomeMu.Unlock()
+	}
+
 }
 
 func writeTimeout(ctx context.Context, timeout time.Duration, c *websocket.Conn, msg []byte) error {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -47,6 +48,12 @@ type subscriber struct {
 	address   string
 	userType  string
 	closeSlow func()
+}
+
+type subscriberMessage struct {
+	Address  string `json:"address"`
+	UserType string `json:"user_type"`
+	View     string `json:"view"`
 }
 
 // newdbServer constructs a dbServer with the defaults.
@@ -104,8 +111,14 @@ func (dbs *dbServer) subscribe(ctx context.Context, w http.ResponseWriter, r *ht
 	var mu sync.Mutex
 	var c *websocket.Conn
 	var closed bool
+	//Extract address from the request and add here
+	decoder := json.NewDecoder(r.Body)
+	var sm subscriberMessage
+	decoder.Decode(&sm)
 	s := &subscriber{
-		msgs: make(chan []byte, dbs.subscriberMessageBuffer),
+		address:  sm.Address,
+		userType: sm.UserType,
+		msgs:     make(chan []byte, dbs.subscriberMessageBuffer),
 		closeSlow: func() {
 			mu.Lock()
 			defer mu.Unlock()
@@ -132,7 +145,8 @@ func (dbs *dbServer) subscribe(ctx context.Context, w http.ResponseWriter, r *ht
 	defer c.CloseNow()
 
 	ctx = c.CloseRead(ctx)
-
+	//Send initial payload here
+	writeTimeout(ctx, time.Second*5, c, []byte("subscribed"))
 	for {
 		select {
 		case msg := <-s.msgs:
@@ -187,6 +201,7 @@ func (dbs *dbServer) listener() {
 		case "vault_update":
 			fmt.Println("Received an update on vault_update")
 		case "state_transition":
+			//Push this to all channels (without address as well)
 			fmt.Println("Received an update on state_transition")
 		case "ob_update":
 			fmt.Println("Received an update on ob_update")
@@ -246,6 +261,5 @@ func (dbs *dbServer) deleteSubscriber(s *subscriber) {
 func writeTimeout(ctx context.Context, timeout time.Duration, c *websocket.Conn, msg []byte) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-
 	return c.Write(ctx, websocket.MessageText, msg)
 }

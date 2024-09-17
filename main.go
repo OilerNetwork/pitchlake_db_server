@@ -2,9 +2,7 @@ package main
 
 import (
 	"context"
-	"errors"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -30,15 +28,6 @@ func main() {
 // OR Trigger:or_update
 func run() error {
 
-	if len(os.Args) < 2 {
-		return errors.New("please provide an address to listen on as the first argument")
-	}
-
-	l, err := net.Listen("tcp", os.Args[1])
-	if err != nil {
-		return err
-	}
-	log.Printf("listening on ws://%v", l.Addr())
 	dbs := newDBServer()
 	s := &http.Server{
 		Handler:      dbs,
@@ -47,7 +36,7 @@ func run() error {
 	}
 	errc := make(chan error, 1)
 	go func() {
-		errc <- s.Serve(l)
+		errc <- s.ListenAndServe()
 	}()
 
 	sigs := make(chan os.Signal, 1)

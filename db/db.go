@@ -77,10 +77,38 @@ func (db *DB) GetAllVaultStates() ([]models.VaultState, error) {
 }
 
 // GetOptionRoundByID retrieves an OptionRound record by its ID
-func (db *DB) GetOptionRoundByID(id string) (*models.OptionRound, error) {
+func (db *DB) GetOptionRoundByID(id uint64) (*models.OptionRound, error) {
 	var optionRound models.OptionRound
 	query := `SELECT address, round_id, bids, cap_level, starting_block, ending_block, settlement_date, starting_liquidity, queued_liquidity, available_options, settlement_price, strike_price, sold_options, clearing_price, state, premiums, payout_per_option FROM option_rounds WHERE id=$1`
 	err := db.Conn.QueryRow(context.Background(), query, id).Scan(
+		&optionRound.Address,
+		&optionRound.RoundID,
+		&optionRound.Bids,
+		&optionRound.CapLevel,
+		&optionRound.StartingBlock,
+		&optionRound.EndingBlock,
+		&optionRound.SettlementDate,
+		&optionRound.StartingLiquidity,
+		&optionRound.QueuedLiquidity,
+		&optionRound.AvailableOptions,
+		&optionRound.SettlementPrice,
+		&optionRound.StrikePrice,
+		&optionRound.SoldOptions,
+		&optionRound.ClearingPrice,
+		&optionRound.State,
+		&optionRound.Premiums,
+		&optionRound.PayoutPerOption,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &optionRound, nil
+}
+
+func (db *DB) GetOptionRoundByAddress(address string) (*models.OptionRound, error) {
+	var optionRound models.OptionRound
+	query := `SELECT address, round_id, bids, cap_level, starting_block, ending_block, settlement_date, starting_liquidity, queued_liquidity, available_options, settlement_price, strike_price, sold_options, clearing_price, state, premiums, payout_per_option FROM option_rounds WHERE address=$1`
+	err := db.Conn.QueryRow(context.Background(), query, address).Scan(
 		&optionRound.Address,
 		&optionRound.RoundID,
 		&optionRound.Bids,
@@ -150,7 +178,7 @@ func (db *DB) GetAllOptionRounds() ([]models.OptionRound, error) {
 }
 
 // GetLiquidityProviderStateByID retrieves a LiquidityProviderState record by its Address
-func (db *DB) GetLiquidityProviderStateByID(address string) (*models.LiquidityProviderState, error) {
+func (db *DB) GetLiquidityProviderStateByAddress(address string) (*models.LiquidityProviderState, error) {
 	var liquidityProviderState models.LiquidityProviderState
 	query := `SELECT address, unlocked_balance, locked_balance, stashed_balance, queued_balance, last_block FROM liquidity_provider_states WHERE address=$1`
 	err := db.Conn.QueryRow(context.Background(), query, address).Scan(
@@ -201,7 +229,7 @@ func (db *DB) GetAllLiquidityProviderStates() ([]models.LiquidityProviderState, 
 }
 
 // GetOptionBuyerByID retrieves an OptionBuyer record by its Address
-func (db *DB) GetOptionBuyerByID(address string) (*models.OptionBuyer, error) {
+func (db *DB) GetOptionBuyerByAddress(address string) (*models.OptionBuyer, error) {
 	var optionBuyer models.OptionBuyer
 	query := `SELECT address, round_id, tokenizable_options, refundable_balance FROM option_buyers WHERE address=$1`
 	err := db.Conn.QueryRow(context.Background(), query, address).Scan(

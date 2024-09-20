@@ -17,14 +17,14 @@ type LiquidityProvider struct {
 
 type OptionBuyer struct {
 	Address            string `json:"address"`
-	RoundID            string `json:"round_id"`
+	RoundID            uint64 `json:"round_id"`
 	TokenizableOptions string `json:"tokenizable_options"`
 	RefundableBalance  string `json:"refundable_balance"`
 }
 
 type OptionRound struct {
 	Address           string `json:"address"`
-	RoundID           string `json:"round_id"`
+	RoundID           uint64 `json:"round_id"`
 	Bids              string `json:"bids"` // Store bids as JSON in PostgreSQL
 	CapLevel          string `json:"cap_level"`
 	StartingBlock     string `json:"starting_block"`
@@ -63,14 +63,14 @@ type LiquidityProviderState struct {
 
 type QueuedLiquidity struct {
 	Address        string `json:"address"`
-	RoundID        string `json:"round_id"`
+	RoundID        uint64 `json:"round_id"`
 	StartingAmount string `json:"starting_amount"`
 	QueuedAmount   string `json:"amount"`
 }
 
 type Bid struct {
 	Address   string `json:"address"`
-	RoundID   string `json:"round_id"`
+	RoundID   uint64 `json:"round_id"`
 	BidID     string `json:"bid_id"`
 	TreeNonce string `json:"tree_nonce"`
 	Amount    string `json:"amount"`

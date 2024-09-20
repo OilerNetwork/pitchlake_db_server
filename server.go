@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"pitchlake-backend/db"
+	"pitchlake-backend/models"
 	"sync"
 	"time"
 
@@ -46,16 +47,18 @@ type dbServer struct {
 // Messages are sent on the msgs channel and if the client
 // cannot keep up with the messages, closeSlow is called.
 type subscriber struct {
-	msgs      chan []byte
-	address   string
-	userType  string
-	closeSlow func()
+	msgs        chan []byte
+	address     string
+	userType    string
+	optionRound uint64
+	closeSlow   func()
 }
 
 type subscriberMessage struct {
-	Address  string `json:"address"`
-	UserType string `json:"user_type"`
-	View     string `json:"view"`
+	Address     string `json:"address"`
+	UserType    string `json:"user_type"`
+	View        string `json:"view"`
+	OptionRound uint64 `json:"option_round"`
 }
 
 // newdbServer constructs a dbServer with the defaults.
@@ -115,9 +118,6 @@ func (dbs *dbServer) subscribeVaultHandler(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-// publishHandler reads the request body with a limit of 8192 bytes and then publishes
-// the received message.
-
 // subscribe subscribes the given WebSocket to all broadcast messages.
 // It creates a subscriber with a buffered msgs chan to give some room to slower
 // connections and then registers the subscriber. It then listens for all messages
@@ -165,12 +165,47 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 
 	ctx = c.CloseRead(ctx)
 	//Send initial payload here
+	var vaultSubscription models.VaultSubscription
 	vaultState, err := dbs.db.GetVaultStateByID(s.address)
+	if sm.OptionRound != 0 {
+		optionRoundState, err := dbs.db.GetOptionRoundByID(sm.OptionRound)
+		if err != nil {
+			return err
+		}
+		vaultSubscription.OptionRoundState = *optionRoundState
+	} else {
+		optionRoundState, err := dbs.db.GetOptionRoundByAddress(vaultState.CurrentRoundAddress)
+		if err != nil {
+			return err
+		}
+		vaultSubscription.OptionRoundState = *optionRoundState
+	}
+
+	vaultSubscription.VaultState = *vaultState
 	if err != nil {
 		return err
 	}
+
+	if sm.UserType == "lp" {
+
+		lpState, err := dbs.db.GetLiquidityProviderStateByAddress(s.address)
+		if err != nil {
+			return err
+		}
+		vaultSubscription.LiquidityProviderState = *lpState
+	} else if sm.UserType == "ob" {
+
+		obState, err := dbs.db.GetOptionBuyerByAddress(s.address)
+		if err != nil {
+			return err
+		}
+		vaultSubscription.OptionBuyerState = *obState
+	} else {
+		return errors.New("invalid user type")
+	}
+
 	// Marshal the VaultState to a JSON byte array
-	jsonPayload, err := json.Marshal(vaultState)
+	jsonPayload, err := json.Marshal(vaultSubscription)
 	if err != nil {
 		return err
 	}

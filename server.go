@@ -165,7 +165,17 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 
 	ctx = c.CloseRead(ctx)
 	//Send initial payload here
-	writeTimeout(ctx, time.Second*5, c, []byte("subscribed"))
+	vaultState, err := dbs.db.GetVaultStateByID(s.address)
+	if err != nil {
+		return err
+	}
+	// Marshal the VaultState to a JSON byte array
+	jsonPayload, err := json.Marshal(vaultState)
+	if err != nil {
+		return err
+	}
+
+	writeTimeout(ctx, time.Second*5, c, jsonPayload)
 	for {
 		select {
 		case msg := <-s.msgs:

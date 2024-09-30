@@ -258,7 +258,10 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 	log.Printf("%v", sm)
 
 	s := &subscriber{
-		msgs: make(chan []byte, dbs.subscriberMessageBuffer),
+		address:     sm.Address,
+		userType:    sm.UserType,
+		optionRound: sm.OptionRound,
+		msgs:        make(chan []byte, dbs.subscriberMessageBuffer),
 		closeSlow: func() {
 			mu.Lock()
 			defer mu.Unlock()
@@ -273,6 +276,7 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 	dbs.addSubscriber(s, sm.Address)
 	defer dbs.deleteSubscriber(s, sm.Address)
 
+	log.Printf("Subscribed to home")
 	mu.Lock()
 	if closed {
 		mu.Unlock()
@@ -291,6 +295,7 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 				return
 			}
 			log.Printf("Received message from client: %s", msg)
+			log.Printf("Client Info %v", s.address)
 			// Handle the received message here
 		}
 	}()

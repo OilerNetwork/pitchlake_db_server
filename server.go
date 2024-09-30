@@ -41,6 +41,8 @@ type dbServer struct {
 	subscribersVault   map[string]map[*subscriber]struct{}
 	subscribersHomeMu  sync.Mutex
 	subscribersHome    map[*subscriber]struct{}
+	ctx                context.Context
+	cancel             context.CancelFunc
 }
 
 // subscriber represents a subscriber.
@@ -56,15 +58,15 @@ type subscriber struct {
 
 type subscriberMessage struct {
 	Address     string `json:"address"`
-	UserType    string `json:"user_type"`
-	View        string `json:"view"`
-	OptionRound uint64 `json:"option_round"`
+	UserType    string `json:"userType"`
+	OptionRound uint64 `json:"optionRound"`
 }
 
 // newdbServer constructs a dbServer with the defaults.
 // Create a custom context for the server here and pass it to the db package
-func newDBServer() *dbServer {
+func newDBServer(ctx context.Context) *dbServer {
 
+	ctx, cancel := context.WithCancel(ctx)
 	db := &db.DB{}
 	connString := ""
 	db.Init(connString)
@@ -74,11 +76,13 @@ func newDBServer() *dbServer {
 		subscribersVault:        make(map[string]map[*subscriber]struct{}),
 		subscribersHome:         make(map[*subscriber]struct{}),
 		db:                      db,
+		ctx:                     ctx,
+		cancel:                  cancel,
 	}
 	dbs.serveMux.Handle("/", http.FileServer(http.Dir(".")))
 	dbs.serveMux.HandleFunc("/subscribeHome", dbs.subscribeHomeHandler)
 	dbs.serveMux.HandleFunc("/subscribeVault", dbs.subscribeVaultHandler)
-	dbs.listener()
+	go dbs.listener()
 	return dbs
 }
 
@@ -87,6 +91,7 @@ func (dbs *dbServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (dbs *dbServer) subscribeHomeHandler(w http.ResponseWriter, r *http.Request) {
+	println("Subscribing to home")
 	err := dbs.subscribeHome(r.Context(), w, r)
 	if errors.Is(err, context.Canceled) {
 		return
@@ -147,6 +152,7 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 			}
 		},
 	}
+
 	dbs.addSubscriber(s, "Vault")
 	defer dbs.deleteSubscriber(s, "Vault")
 
@@ -228,10 +234,29 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 	var mu sync.Mutex
 	var c *websocket.Conn
 	var closed bool
-	//Extract address from the request and add here
-	decoder := json.NewDecoder(r.Body)
+
+	// Accept the WebSocket connection
+	c2, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		OriginPatterns: []string{"localhost:3000"},
+	})
+	if err != nil {
+		return err
+	}
+	defer c2.Close(websocket.StatusInternalError, "Internal server error")
+
+	// Read the first message to get the subscription data
+	_, msg, err := c2.Read(ctx)
+	if err != nil {
+		return err
+	}
+
 	var sm subscriberMessage
-	decoder.Decode(&sm)
+	err = json.Unmarshal(msg, &sm)
+	if err != nil {
+		return err
+	}
+	log.Printf("%v", sm)
+
 	s := &subscriber{
 		msgs: make(chan []byte, dbs.subscriberMessageBuffer),
 		closeSlow: func() {
@@ -243,13 +268,11 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 			}
 		},
 	}
-	dbs.addSubscriber(s, "Vault")
-	defer dbs.deleteSubscriber(s, "Vault")
 
-	c2, err := websocket.Accept(w, r, nil)
-	if err != nil {
-		return err
-	}
+	// Add the subscriber to the appropriate map based on the address
+	dbs.addSubscriber(s, sm.Address)
+	defer dbs.deleteSubscriber(s, sm.Address)
+
 	mu.Lock()
 	if closed {
 		mu.Unlock()
@@ -258,13 +281,27 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 	c = c2
 	mu.Unlock()
 	defer c.CloseNow()
+	// Send initial payload here
 
-	ctx = c.CloseRead(ctx)
-	//Send initial payload here
+	go func() {
+		for {
+			_, msg, err := c.Read(ctx)
+			if err != nil {
+				log.Printf("Error reading message: %v", err)
+				return
+			}
+			log.Printf("Received message from client: %s", msg)
+			// Handle the received message here
+		}
+	}()
+
+	// Send initial payload here
 	writeTimeout(ctx, time.Second*5, c, []byte("subscribed"))
+
 	for {
 		select {
 		case msg := <-s.msgs:
+			log.Printf("HELLO")
 			err := writeTimeout(ctx, time.Second*5, c, msg)
 			if err != nil {
 				return err
@@ -276,56 +313,39 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 }
 
 func (dbs *dbServer) listener() {
-	_, err := dbs.db.Conn.Exec(context.Background(), "LISTEN lp_update")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	_, err = dbs.db.Conn.Exec(context.Background(), "LISTEN vault_update")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	_, err = dbs.db.Conn.Exec(context.Background(), "LISTEN state_transition")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	_, err = dbs.db.Conn.Exec(context.Background(), "LISTEN ob_update")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	_, err = dbs.db.Conn.Exec(context.Background(), "LISTEN or_update")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println("Waiting for notifications...")
-
 	for {
-		// Wait for a notification
-		notification, err := dbs.db.Conn.WaitForNotification(context.Background())
-		if err != nil {
-			log.Fatal(err)
+		select {
+		case <-dbs.ctx.Done():
+			dbs.logf("Listener shutting down")
+			return
+		default:
+			// Wait for a notification
+			notification, err := dbs.db.Conn.WaitForNotification(dbs.ctx)
+			if err != nil {
+				if dbs.ctx.Err() != nil {
+					// Context was canceled, exit the loop
+					return
+				}
+				dbs.logf("Error waiting for notification: %v", err)
+				continue
+			}
+			// Process notification here
+			switch notification.Channel {
+			case "lp_update":
+				fmt.Println("Received an update on lp_row_update")
+			case "vault_update":
+				fmt.Println("Received an update on vault_update")
+			case "state_transition":
+				// Push this to all channels (without address as well)
+				fmt.Println("Received an update on state_transition")
+			case "ob_update":
+				fmt.Println("Received an update on ob_update")
+			case "or_update":
+				fmt.Println("Received an update on or_update")
+			}
+			dbs.publishAddress(notification.Channel, []byte(notification.Payload))
+			dbs.publishAll([]byte(notification.Payload))
 		}
-		//Process notification here
-		switch notification.Channel {
-		case "lp_update":
-			fmt.Println("Received an update on lp_row_update")
-		case "vault_update":
-			fmt.Println("Received an update on vault_update")
-		case "state_transition":
-			//Push this to all channels (without address as well)
-			fmt.Println("Received an update on state_transition")
-		case "ob_update":
-			fmt.Println("Received an update on ob_update")
-		case "or_update":
-			fmt.Println("Received an update on or_update")
-
-		}
-		dbs.publishAddress(notification.Channel, []byte(notification.Payload))
-		dbs.publishAll([]byte(notification.Payload))
 	}
 }
 
@@ -361,6 +381,7 @@ func (dbs *dbServer) publishAll(msg []byte) {
 
 // addSubscriber registers a subscriber.
 func (dbs *dbServer) addSubscriber(s *subscriber, subscriptionType string) {
+	println("CP3")
 	if subscriptionType == "Vault" {
 		dbs.subscribersVaultMu.Lock()
 		dbs.subscribersVault[s.address][s] = struct{}{}

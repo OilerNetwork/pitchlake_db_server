@@ -14,7 +14,7 @@ type DB struct {
 
 // @dev Pass context from the server here
 func (db *DB) Init(conninfo string) {
-	connStr := "postgres://username:password@localhost:5432/mydb"
+	connStr := "postgres://postgres:12345678@localhost:5432/pitchlake"
 
 	conn, err := pgx.Connect(context.Background(), connStr)
 	if err != nil {

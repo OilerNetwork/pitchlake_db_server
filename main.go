@@ -28,13 +28,17 @@ func main() {
 // OR Trigger:or_update
 func run() error {
 
-	dbs := newDBServer()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+	dbs := newDBServer(ctx)
 	s := &http.Server{
+		Addr:         ":8080",
 		Handler:      dbs,
 		ReadTimeout:  time.Second * 10,
 		WriteTimeout: time.Second * 10,
 	}
 	errc := make(chan error, 1)
+	log.Printf("server started at %v", s.Addr)
 	go func() {
 		errc <- s.ListenAndServe()
 	}()
@@ -47,9 +51,6 @@ func run() error {
 	case sig := <-sigs:
 		log.Printf("terminating: %v", sig)
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
 
 	return s.Shutdown(ctx)
 }

@@ -1,6 +1,6 @@
 ## Build package
 
-go build
+go mod tidy
  
 ## Run package
 

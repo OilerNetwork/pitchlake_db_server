@@ -335,7 +335,7 @@ func (dbs *dbServer) listener() {
 				dbs.logf("Error waiting for notification: %v", err)
 				continue
 			}
-			println("Waiting for notification")
+			dbs.logf("Waiting for notification")
 			// Process notification here
 			switch notification.Channel {
 			case "lp_update":

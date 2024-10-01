@@ -295,6 +295,7 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 				return
 			}
 			log.Printf("Received message from client: %s", msg)
+			s.msgs <- []byte("RECEIVED")
 			log.Printf("Client Info %v", s.address)
 			// Handle the received message here
 		}
@@ -347,6 +348,8 @@ func (dbs *dbServer) listener() {
 				fmt.Println("Received an update on ob_update")
 			case "or_update":
 				fmt.Println("Received an update on or_update")
+			default:
+				fmt.Println("Received an update on unknown channel", notification.Channel)
 			}
 			dbs.publishAddress(notification.Channel, []byte(notification.Payload))
 			dbs.publishAll([]byte(notification.Payload))

@@ -335,6 +335,7 @@ func (dbs *dbServer) listener() {
 				dbs.logf("Error waiting for notification: %v", err)
 				continue
 			}
+			println("Waiting for notification")
 			// Process notification here
 			switch notification.Channel {
 			case "lp_update":
@@ -346,7 +347,7 @@ func (dbs *dbServer) listener() {
 				fmt.Println("Received an update on state_transition")
 			case "ob_update":
 				fmt.Println("Received an update on ob_update")
-			case "or_update":
+			case "notify_or_update":
 				fmt.Println("Received an update on or_update")
 			default:
 				fmt.Println("Received an update on unknown channel", notification.Channel)

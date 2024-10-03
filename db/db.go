@@ -6,15 +6,18 @@ import (
 	"pitchlake-backend/models"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/joho/godotenv"
 )
 
 type DB struct {
 	Conn *pgx.Conn
 }
 
+var envFile, _ = godotenv.Read(".env")
+
 // @dev Pass context from the server here
 func (db *DB) Init(conninfo string) {
-	connStr := "postgres://postgres:12345678@localhost:5432/pitchlake"
+	connStr := envFile["DB_URL"]
 
 	conn, err := pgx.Connect(context.Background(), connStr)
 	if err != nil {
@@ -83,10 +86,9 @@ func (db *DB) GetOptionRoundByID(id uint64) (*models.OptionRound, error) {
 	err := db.Conn.QueryRow(context.Background(), query, id).Scan(
 		&optionRound.Address,
 		&optionRound.RoundID,
-		&optionRound.Bids,
 		&optionRound.CapLevel,
-		&optionRound.StartingBlock,
-		&optionRound.EndingBlock,
+		&optionRound.StartDate,
+		&optionRound.EndDate,
 		&optionRound.SettlementDate,
 		&optionRound.StartingLiquidity,
 		&optionRound.QueuedLiquidity,
@@ -111,10 +113,9 @@ func (db *DB) GetOptionRoundByAddress(address string) (*models.OptionRound, erro
 	err := db.Conn.QueryRow(context.Background(), query, address).Scan(
 		&optionRound.Address,
 		&optionRound.RoundID,
-		&optionRound.Bids,
 		&optionRound.CapLevel,
-		&optionRound.StartingBlock,
-		&optionRound.EndingBlock,
+		&optionRound.StartDate,
+		&optionRound.EndDate,
 		&optionRound.SettlementDate,
 		&optionRound.StartingLiquidity,
 		&optionRound.QueuedLiquidity,
@@ -148,10 +149,9 @@ func (db *DB) GetAllOptionRounds() ([]models.OptionRound, error) {
 		err := rows.Scan(
 			&optionRound.Address,
 			&optionRound.RoundID,
-			&optionRound.Bids,
 			&optionRound.CapLevel,
-			&optionRound.StartingBlock,
-			&optionRound.EndingBlock,
+			&optionRound.StartDate,
+			&optionRound.EndDate,
 			&optionRound.SettlementDate,
 			&optionRound.StartingLiquidity,
 			&optionRound.QueuedLiquidity,

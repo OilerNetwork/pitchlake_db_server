@@ -1,5 +1,56 @@
 package models
 
+import (
+	"fmt"
+	"math/big"
+	"strings"
+)
+
+type BigInt struct {
+	*big.Int
+}
+
+func (b *BigInt) UnmarshalJSON(data []byte) error {
+	if b.Int == nil {
+		b.Int = new(big.Int)
+	}
+
+	s := string(data)
+	s = strings.Trim(s, "\"") // Remove quotes if present
+
+	// Check if the string is hexadecimal
+	if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
+		_, ok := b.Int.SetString(s[2:], 16)
+		if !ok {
+			return fmt.Errorf("failed to parse %s as hex big.Int", s)
+		}
+	} else {
+		// Try to parse as decimal
+		_, ok := b.Int.SetString(s, 10)
+		if !ok {
+			return fmt.Errorf("failed to parse %s as decimal big.Int", s)
+		}
+	}
+
+	// Ensure the number is not negative and fits within uint256
+	if b.Int.Sign() < 0 {
+		return fmt.Errorf("negative numbers are not allowed")
+	}
+	if b.Int.BitLen() > 256 {
+		return fmt.Errorf("number exceeds uint256 range")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements the json.Marshaler interface
+func (b BigInt) MarshalJSON() ([]byte, error) {
+	if b.Int == nil {
+		return []byte("null"), nil
+	}
+	return []byte(fmt.Sprintf("\"%s\"", b.Int.String())), nil
+}
+
 type Vault struct {
 	BlockNumber     string `json:"block_number"`
 	UnlockedBalance string `json:"unlocked_balance"`
@@ -25,21 +76,21 @@ type OptionBuyer struct {
 type OptionRound struct {
 	Address           string `json:"address"`
 	RoundID           uint64 `json:"round_id"`
-	Bids              string `json:"bids"` // Store bids as JSON in PostgreSQL
 	CapLevel          string `json:"cap_level"`
-	StartingBlock     string `json:"starting_block"`
-	EndingBlock       string `json:"ending_block"`
+	StartDate         string `json:"start_date"`
+	EndDate           string `json:"end_date"`
 	SettlementDate    string `json:"settlement_date"`
-	StartingLiquidity string `json:"starting_liquidity"`
-	QueuedLiquidity   string `json:"queued_liquidity"`
-	AvailableOptions  string `json:"available_options"`
-	SettlementPrice   string `json:"settlement_price"`
-	StrikePrice       string `json:"strike_price"`
-	SoldOptions       string `json:"sold_options"`
-	ClearingPrice     string `json:"clearing_price"`
+	StartingLiquidity BigInt `json:"starting_liquidity"`
+	AvailableOptions  BigInt `json:"available_options"`
+	ClearingPrice     BigInt `json:"clearing_price"`
+	SettlementPrice   BigInt `json:"settlement_price"`
+	StrikePrice       BigInt `json:"strike_price"`
+	SoldOptions       BigInt `json:"sold_options"`
 	State             string `json:"state"`
-	Premiums          string `json:"premiums"`
-	PayoutPerOption   string `json:"payout_per_option"`
+	Premiums          BigInt `json:"premiums"`
+	QueuedLiquidity   BigInt `json:"queued_liquidity"`
+	PayoutPerOption   BigInt `json:"payout_per_option"`
+	VaultAddress      string `json:"vault_address"`
 }
 
 type VaultState struct {

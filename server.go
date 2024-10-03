@@ -49,17 +49,19 @@ type dbServer struct {
 // Messages are sent on the msgs channel and if the client
 // cannot keep up with the messages, closeSlow is called.
 type subscriber struct {
-	msgs        chan []byte
-	address     string
-	userType    string
-	optionRound uint64
-	closeSlow   func()
+	msgs         chan []byte
+	address      string
+	userType     string
+	vaultAddress string
+	optionRound  uint64
+	closeSlow    func()
 }
 
 type subscriberMessage struct {
-	Address     string `json:"address"`
-	UserType    string `json:"userType"`
-	OptionRound uint64 `json:"optionRound"`
+	Address      string `json:"address"`
+	VaultAddress string `json:"vaultAddress"`
+	UserType     string `json:"userType"`
+	OptionRound  uint64 `json:"optionRound"`
 }
 
 // newdbServer constructs a dbServer with the defaults.
@@ -136,13 +138,33 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 	var c *websocket.Conn
 	var closed bool
 	//Extract address from the request and add here
-	decoder := json.NewDecoder(r.Body)
+
+	c2, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		OriginPatterns: []string{"localhost:3000"},
+	})
+	if err != nil {
+		return err
+	}
+	defer c2.Close(websocket.StatusInternalError, "Internal server error")
+
+	// Read the first message to get the subscription data
+	_, msg, err := c2.Read(ctx)
+	if err != nil {
+		return err
+	}
+
 	var sm subscriberMessage
-	decoder.Decode(&sm)
+	err = json.Unmarshal(msg, &sm)
+	if err != nil {
+		return err
+	}
+	log.Printf("%v", sm)
+
 	s := &subscriber{
-		address:  sm.Address,
-		userType: sm.UserType,
-		msgs:     make(chan []byte, dbs.subscriberMessageBuffer),
+		address:     sm.Address,
+		userType:    sm.UserType,
+		optionRound: sm.OptionRound,
+		msgs:        make(chan []byte, dbs.subscriberMessageBuffer),
 		closeSlow: func() {
 			mu.Lock()
 			defer mu.Unlock()
@@ -152,14 +174,9 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 			}
 		},
 	}
-
 	dbs.addSubscriber(s, "Vault")
 	defer dbs.deleteSubscriber(s, "Vault")
 
-	c2, err := websocket.Accept(w, r, nil)
-	if err != nil {
-		return err
-	}
 	mu.Lock()
 	if closed {
 		mu.Unlock()
@@ -216,10 +233,26 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 		return err
 	}
 
+	go func() {
+		for {
+			_, msg, err := c.Read(ctx)
+			if err != nil {
+				log.Printf("Error reading message: %v", err)
+				return
+			}
+			log.Printf("Received message from client: %s", msg)
+			//Unmarshall the json here and send the updates respectively
+			s.msgs <- []byte("RECEIVED")
+			log.Printf("Client Info %v", s.address)
+			// Handle the received message here
+		}
+	}()
+
 	writeTimeout(ctx, time.Second*5, c, jsonPayload)
 	for {
 		select {
 		case msg := <-s.msgs:
+			//Push messages received on the subscriber channel to the client
 			err := writeTimeout(ctx, time.Second*5, c, msg)
 			if err != nil {
 				return err
@@ -258,10 +291,8 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 	log.Printf("%v", sm)
 
 	s := &subscriber{
-		address:     sm.Address,
-		userType:    sm.UserType,
-		optionRound: sm.OptionRound,
-		msgs:        make(chan []byte, dbs.subscriberMessageBuffer),
+		address: sm.Address,
+		msgs:    make(chan []byte, dbs.subscriberMessageBuffer),
 		closeSlow: func() {
 			mu.Lock()
 			defer mu.Unlock()
@@ -319,41 +350,70 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 }
 
 func (dbs *dbServer) listener() {
+	_, err := dbs.db.Conn.Exec(context.Background(), "LISTEN lp_update")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = dbs.db.Conn.Exec(context.Background(), "LISTEN vault_update")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = dbs.db.Conn.Exec(context.Background(), "LISTEN state_transition")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = dbs.db.Conn.Exec(context.Background(), "LISTEN ob_update")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = dbs.db.Conn.Exec(context.Background(), "LISTEN or_update")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Waiting for notifications...")
+
 	for {
-		select {
-		case <-dbs.ctx.Done():
-			dbs.logf("Listener shutting down")
-			return
-		default:
-			// Wait for a notification
-			notification, err := dbs.db.Conn.WaitForNotification(dbs.ctx)
+		// Wait for a notification
+		notification, err := dbs.db.Conn.WaitForNotification(context.Background())
+		if err != nil {
+			log.Fatal(err)
+		}
+		//Process notification here
+		switch notification.Channel {
+
+		case "lp_update":
+
+			fmt.Printf("Received an update on lp_row_update, %s", notification.Payload)
+		case "vault_update":
+			fmt.Println("Received an update on vault_update")
+		case "state_transition":
+			//Push this to all channels (without address as well)
+			fmt.Println("Received an update on state_transition")
+		case "ob_update":
+			fmt.Println("Received an update on ob_update")
+		case "or_update":
+			fmt.Println("Received an update on or_update")
+			// Parse the JSON payload
+			var updatedRow models.OptionRound
+			err := json.Unmarshal([]byte(notification.Payload), &updatedRow)
 			if err != nil {
-				if dbs.ctx.Err() != nil {
-					// Context was canceled, exit the loop
-					return
+				log.Printf("Error parsing or_update payload: %v", err)
+			} else {
+				// Print the updated row
+				fmt.Printf("Updated OptionRound: %+v\n", updatedRow)
+				for s := range dbs.subscribersVault[updatedRow.VaultAddress] {
+					select {
+					case s.msgs <- []byte(notification.Payload):
+					default:
+						go s.closeSlow()
+					}
 				}
-				dbs.logf("Error waiting for notification: %v", err)
-				continue
 			}
-			dbs.logf("Waiting for notification")
-			// Process notification here
-			switch notification.Channel {
-			case "lp_update":
-				fmt.Println("Received an update on lp_row_update")
-			case "vault_update":
-				fmt.Println("Received an update on vault_update")
-			case "state_transition":
-				// Push this to all channels (without address as well)
-				fmt.Println("Received an update on state_transition")
-			case "ob_update":
-				fmt.Println("Received an update on ob_update")
-			case "notify_or_update":
-				fmt.Println("Received an update on or_update")
-			default:
-				fmt.Println("Received an update on unknown channel", notification.Channel)
-			}
-			dbs.publishAddress(notification.Channel, []byte(notification.Payload))
-			dbs.publishAll([]byte(notification.Payload))
 		}
 	}
 }
@@ -393,7 +453,7 @@ func (dbs *dbServer) addSubscriber(s *subscriber, subscriptionType string) {
 	println("CP3")
 	if subscriptionType == "Vault" {
 		dbs.subscribersVaultMu.Lock()
-		dbs.subscribersVault[s.address][s] = struct{}{}
+		dbs.subscribersVault[s.vaultAddress][s] = struct{}{}
 		dbs.subscribersVaultMu.Unlock()
 	} else if subscriptionType == "Home" {
 		dbs.subscribersHomeMu.Lock()

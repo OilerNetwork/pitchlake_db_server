@@ -2,53 +2,82 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"pitchlake-backend/models"
+	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
 
-type DB struct {
-	Conn *pgx.Conn
-}
-
 var envFile, _ = godotenv.Read(".env")
 
-// @dev Pass context from the server here
-func (db *DB) Init(conninfo string) {
+type DB struct {
+	Conn *pgx.Conn
+	Pool *pgxpool.Pool
+}
+
+func (db *DB) Init() error {
 	connStr := envFile["DB_URL"]
+	config, err := pgxpool.ParseConfig(connStr)
+	if err != nil {
+		return fmt.Errorf("unable to parse connection string: %w", err)
+	}
 
 	conn, err := pgx.Connect(context.Background(), connStr)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+	if err != nil {
+		return fmt.Errorf("unable to create connection pool: %w", err)
+	}
+
 	db.Conn = conn
+	db.Pool = pool
+	return nil
 }
 
 // GetVaultStateByID retrieves a VaultState record by its ID
 func (db *DB) GetVaultStateByID(id string) (*models.VaultState, error) {
+	if db.Pool == nil {
+		return nil, fmt.Errorf("database pool is nil")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	var vaultState models.VaultState
-	query := `SELECT current_round, current_round_address, unlocked_balance, locked_balance, stashed_balance, address, last_block FROM vault_states WHERE id=$1`
-	err := db.Conn.QueryRow(context.Background(), query, id).Scan(
+	query := `SELECT current_round, current_round_address, unlocked_balance, locked_balance, stashed_balance, address, latest_block FROM public."VaultStates" WHERE address=$1`
+
+	err := db.Pool.QueryRow(ctx, query, id).Scan(
 		&vaultState.CurrentRound,
 		&vaultState.CurrentRoundAddress,
 		&vaultState.UnlockedBalance,
 		&vaultState.LockedBalance,
 		&vaultState.StashedBalance,
 		&vaultState.Address,
-		&vaultState.LastBlock,
+		&vaultState.LatestBlock,
 	)
+
 	if err != nil {
-		return nil, err
+		fmt.Println("Error getting vault state by id %s", err.Error())
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("no vault state found with id %s", id)
+		}
+		return nil, fmt.Errorf("error scanning vault state: %w", err)
 	}
+	fmt.Printf("vaultState %+v", vaultState)
 	return &vaultState, nil
 }
 
 // GetAllVaultStates retrieves all VaultState records from the database
 func (db *DB) GetAllVaultStates() ([]models.VaultState, error) {
 	query := `SELECT current_round, current_round_address, unlocked_balance, locked_balance, stashed_balance, address, last_block FROM vault_states`
-	rows, err := db.Conn.Query(context.Background(), query)
+	rows, err := db.Pool.Query(context.Background(), query)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +93,7 @@ func (db *DB) GetAllVaultStates() ([]models.VaultState, error) {
 			&vaultState.LockedBalance,
 			&vaultState.StashedBalance,
 			&vaultState.Address,
-			&vaultState.LastBlock,
+			&vaultState.LatestBlock,
 		)
 		if err != nil {
 			return nil, err
@@ -83,7 +112,7 @@ func (db *DB) GetAllVaultStates() ([]models.VaultState, error) {
 func (db *DB) GetOptionRoundByID(id uint64) (*models.OptionRound, error) {
 	var optionRound models.OptionRound
 	query := `SELECT address, round_id, bids, cap_level, starting_block, ending_block, settlement_date, starting_liquidity, queued_liquidity, available_options, settlement_price, strike_price, sold_options, clearing_price, state, premiums, payout_per_option FROM option_rounds WHERE id=$1`
-	err := db.Conn.QueryRow(context.Background(), query, id).Scan(
+	err := db.Pool.QueryRow(context.Background(), query, id).Scan(
 		&optionRound.Address,
 		&optionRound.RoundID,
 		&optionRound.CapLevel,
@@ -110,7 +139,7 @@ func (db *DB) GetOptionRoundByID(id uint64) (*models.OptionRound, error) {
 func (db *DB) GetOptionRoundByAddress(address string) (*models.OptionRound, error) {
 	var optionRound models.OptionRound
 	query := `SELECT address, round_id, bids, cap_level, starting_block, ending_block, settlement_date, starting_liquidity, queued_liquidity, available_options, settlement_price, strike_price, sold_options, clearing_price, state, premiums, payout_per_option FROM option_rounds WHERE address=$1`
-	err := db.Conn.QueryRow(context.Background(), query, address).Scan(
+	err := db.Pool.QueryRow(context.Background(), query, address).Scan(
 		&optionRound.Address,
 		&optionRound.RoundID,
 		&optionRound.CapLevel,
@@ -137,7 +166,7 @@ func (db *DB) GetOptionRoundByAddress(address string) (*models.OptionRound, erro
 // GetAllOptionRounds retrieves all OptionRound records from the database
 func (db *DB) GetAllOptionRounds() ([]models.OptionRound, error) {
 	query := `SELECT address, round_id, bids, cap_level, starting_block, ending_block, settlement_date, starting_liquidity, queued_liquidity, available_options, settlement_price, strike_price, sold_options, clearing_price, state, premiums, payout_per_option FROM option_rounds`
-	rows, err := db.Conn.Query(context.Background(), query)
+	rows, err := db.Pool.Query(context.Background(), query)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +210,7 @@ func (db *DB) GetAllOptionRounds() ([]models.OptionRound, error) {
 func (db *DB) GetLiquidityProviderStateByAddress(address string) (*models.LiquidityProviderState, error) {
 	var liquidityProviderState models.LiquidityProviderState
 	query := `SELECT address, unlocked_balance, locked_balance, stashed_balance, queued_balance, last_block FROM liquidity_provider_states WHERE address=$1`
-	err := db.Conn.QueryRow(context.Background(), query, address).Scan(
+	err := db.Pool.QueryRow(context.Background(), query, address).Scan(
 		&liquidityProviderState.Address,
 		&liquidityProviderState.UnlockedBalance,
 		&liquidityProviderState.LockedBalance,
@@ -198,7 +227,7 @@ func (db *DB) GetLiquidityProviderStateByAddress(address string) (*models.Liquid
 // GetAllLiquidityProviderStates retrieves all LiquidityProviderState records from the database
 func (db *DB) GetAllLiquidityProviderStates() ([]models.LiquidityProviderState, error) {
 	query := `SELECT address, unlocked_balance, locked_balance, stashed_balance, queued_balance, last_block FROM liquidity_provider_states`
-	rows, err := db.Conn.Query(context.Background(), query)
+	rows, err := db.Pool.Query(context.Background(), query)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +261,7 @@ func (db *DB) GetAllLiquidityProviderStates() ([]models.LiquidityProviderState, 
 func (db *DB) GetOptionBuyerByAddress(address string) (*models.OptionBuyer, error) {
 	var optionBuyer models.OptionBuyer
 	query := `SELECT address, round_id, tokenizable_options, refundable_balance FROM option_buyers WHERE address=$1`
-	err := db.Conn.QueryRow(context.Background(), query, address).Scan(
+	err := db.Pool.QueryRow(context.Background(), query, address).Scan(
 		&optionBuyer.Address,
 		&optionBuyer.RoundID,
 		&optionBuyer.TokenizableOptions,
@@ -247,7 +276,7 @@ func (db *DB) GetOptionBuyerByAddress(address string) (*models.OptionBuyer, erro
 // GetAllOptionBuyers retrieves all OptionBuyer records from the database
 func (db *DB) GetAllOptionBuyers() ([]models.OptionBuyer, error) {
 	query := `SELECT address, round_id, tokenizable_options, refundable_balance FROM option_buyers`
-	rows, err := db.Conn.Query(context.Background(), query)
+	rows, err := db.Pool.Query(context.Background(), query)
 	if err != nil {
 		return nil, err
 	}

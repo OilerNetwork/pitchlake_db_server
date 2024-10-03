@@ -38,7 +38,7 @@ type dbServer struct {
 	serveMux http.ServeMux
 
 	subscribersVaultMu sync.Mutex
-	subscribersVault   map[string]map[*subscriber]struct{}
+	subscribersVault   map[string][]*subscriber
 	subscribersHomeMu  sync.Mutex
 	subscribersHome    map[*subscriber]struct{}
 	ctx                context.Context
@@ -53,7 +53,6 @@ type subscriber struct {
 	address      string
 	userType     string
 	vaultAddress string
-	optionRound  uint64
 	closeSlow    func()
 }
 
@@ -70,12 +69,11 @@ func newDBServer(ctx context.Context) *dbServer {
 
 	ctx, cancel := context.WithCancel(ctx)
 	db := &db.DB{}
-	connString := ""
-	db.Init(connString)
+	db.Init()
 	dbs := &dbServer{
 		subscriberMessageBuffer: 16,
 		logf:                    log.Printf,
-		subscribersVault:        make(map[string]map[*subscriber]struct{}),
+		subscribersVault:        make(map[string][]*subscriber),
 		subscribersHome:         make(map[*subscriber]struct{}),
 		db:                      db,
 		ctx:                     ctx,
@@ -161,10 +159,10 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 	log.Printf("%v", sm)
 
 	s := &subscriber{
-		address:     sm.Address,
-		userType:    sm.UserType,
-		optionRound: sm.OptionRound,
-		msgs:        make(chan []byte, dbs.subscriberMessageBuffer),
+		address:      sm.Address,
+		vaultAddress: sm.VaultAddress,
+		userType:     sm.UserType,
+		msgs:         make(chan []byte, dbs.subscriberMessageBuffer),
 		closeSlow: func() {
 			mu.Lock()
 			defer mu.Unlock()
@@ -186,23 +184,26 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 	mu.Unlock()
 	defer c.CloseNow()
 
-	ctx = c.CloseRead(ctx)
+	println("CP6")
 	//Send initial payload here
 	var vaultSubscription models.VaultSubscription
+	println("s.address %s", s.address)
 	vaultState, err := dbs.db.GetVaultStateByID(s.address)
-	if sm.OptionRound != 0 {
-		optionRoundState, err := dbs.db.GetOptionRoundByID(sm.OptionRound)
-		if err != nil {
-			return err
-		}
-		vaultSubscription.OptionRoundState = *optionRoundState
-	} else {
-		optionRoundState, err := dbs.db.GetOptionRoundByAddress(vaultState.CurrentRoundAddress)
-		if err != nil {
-			return err
-		}
-		vaultSubscription.OptionRoundState = *optionRoundState
-	}
+
+	// if sm.OptionRound != 0 {
+	// 	optionRoundState, err := dbs.db.GetOptionRoundByID(sm.OptionRound)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	vaultSubscription.OptionRoundState = *optionRoundState
+	// } else {
+	// 	optionRoundState, err := dbs.db.GetOptionRoundByAddress(vaultState.CurrentRoundAddress)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	vaultSubscription.OptionRoundState = *optionRoundState
+	// }
+	//@note replace this to fetch all option rounds for the vault
 
 	vaultSubscription.VaultState = *vaultState
 	if err != nil {
@@ -232,7 +233,7 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 	if err != nil {
 		return err
 	}
-
+	println("CP7")
 	go func() {
 		for {
 			_, msg, err := c.Read(ctx)
@@ -291,8 +292,9 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 	log.Printf("%v", sm)
 
 	s := &subscriber{
-		address: sm.Address,
-		msgs:    make(chan []byte, dbs.subscriberMessageBuffer),
+		address:      sm.Address,
+		vaultAddress: sm.VaultAddress,
+		msgs:         make(chan []byte, dbs.subscriberMessageBuffer),
 		closeSlow: func() {
 			mu.Lock()
 			defer mu.Unlock()
@@ -304,7 +306,8 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 	}
 
 	// Add the subscriber to the appropriate map based on the address
-	dbs.addSubscriber(s, sm.Address)
+	dbs.addSubscriber(s, "Home")
+
 	defer dbs.deleteSubscriber(s, sm.Address)
 
 	log.Printf("Subscribed to home")
@@ -406,12 +409,8 @@ func (dbs *dbServer) listener() {
 			} else {
 				// Print the updated row
 				fmt.Printf("Updated OptionRound: %+v\n", updatedRow)
-				for s := range dbs.subscribersVault[updatedRow.VaultAddress] {
-					select {
-					case s.msgs <- []byte(notification.Payload):
-					default:
-						go s.closeSlow()
-					}
+				for _, s := range dbs.subscribersVault[updatedRow.VaultAddress] {
+					s.msgs <- []byte(notification.Payload)
 				}
 			}
 		}
@@ -423,7 +422,7 @@ func (dbs *dbServer) publishAddress(address string, msg []byte) {
 	dbs.subscribersVaultMu.Lock()
 	defer dbs.subscribersVaultMu.Unlock()
 
-	for s := range dbs.subscribersVault[address] {
+	for _, s := range dbs.subscribersVault[address] {
 		select {
 		case s.msgs <- msg:
 		default:
@@ -438,7 +437,7 @@ func (dbs *dbServer) publishAll(msg []byte) {
 	defer dbs.subscribersVaultMu.Unlock()
 
 	for address := range dbs.subscribersVault {
-		for s := range dbs.subscribersVault[address] {
+		for _, s := range dbs.subscribersVault[address] {
 			select {
 			case s.msgs <- msg:
 			default:
@@ -453,8 +452,14 @@ func (dbs *dbServer) addSubscriber(s *subscriber, subscriptionType string) {
 	println("CP3")
 	if subscriptionType == "Vault" {
 		dbs.subscribersVaultMu.Lock()
-		dbs.subscribersVault[s.vaultAddress][s] = struct{}{}
-		dbs.subscribersVaultMu.Unlock()
+		defer dbs.subscribersVaultMu.Unlock()
+
+		// Initialize the slice if it doesn't exist
+		if _, exists := dbs.subscribersVault[s.vaultAddress]; !exists {
+			dbs.subscribersVault[s.vaultAddress] = make([]*subscriber, 0)
+		}
+
+		dbs.subscribersVault[s.vaultAddress] = append(dbs.subscribersVault[s.vaultAddress], s)
 	} else if subscriptionType == "Home" {
 		dbs.subscribersHomeMu.Lock()
 		dbs.subscribersHome[s] = struct{}{}
@@ -464,16 +469,37 @@ func (dbs *dbServer) addSubscriber(s *subscriber, subscriptionType string) {
 
 // deleteSubscriber deletes the given subscriber.
 func (dbs *dbServer) deleteSubscriber(s *subscriber, subscriptionType string) {
+	println("CPBEFORE")
 	if subscriptionType == "Vault" {
 		dbs.subscribersVaultMu.Lock()
-		delete(dbs.subscribersVault[s.address], s)
-		dbs.subscribersVaultMu.Unlock()
+		defer dbs.subscribersVaultMu.Unlock()
+
+		subscribers, exists := dbs.subscribersVault[s.vaultAddress]
+		if !exists {
+			return // Nothing to delete
+		}
+
+		for i, subscriber := range subscribers {
+			if subscriber == s {
+				// Replace the element to be deleted with the last element
+				subscribers[i] = subscribers[len(subscribers)-1]
+				// Truncate the slice
+				dbs.subscribersVault[s.vaultAddress] = subscribers[:len(subscribers)-1]
+				break
+			}
+		}
+
+		// If the slice is empty after deletion, remove the key from the map
+		if len(dbs.subscribersVault[s.vaultAddress]) == 0 {
+			delete(dbs.subscribersVault, s.vaultAddress)
+		}
 	} else if subscriptionType == "Home" {
 		dbs.subscribersHomeMu.Lock()
 		delete(dbs.subscribersHome, s)
 		dbs.subscribersHomeMu.Unlock()
 	}
 
+	println("CPAFTER")
 }
 
 func writeTimeout(ctx context.Context, timeout time.Duration, c *websocket.Conn, msg []byte) error {

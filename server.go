@@ -394,15 +394,44 @@ func (dbs *dbServer) listener() {
 		switch notification.Channel {
 
 		case "lp_update":
-
+			var updatedRow models.LiquidityProviderState
+			err := json.Unmarshal([]byte(notification.Payload), &updatedRow)
+			if err != nil {
+				log.Printf("Error parsing lp_update payload: %v", err)
+			}
+			for _, vaults := range dbs.subscribersVault {
+				for _, s := range vaults {
+					if s.address == updatedRow.Address && s.userType == "lp" {
+						s.msgs <- []byte(notification.Payload)
+					}
+				}
+			}
 			fmt.Printf("Received an update on lp_row_update, %s", notification.Payload)
 		case "vault_update":
+			var updatedRow models.VaultState
+			err := json.Unmarshal([]byte(notification.Payload), &updatedRow)
+			if err != nil {
+				log.Printf("Error parsing vault_update payload: %v", err)
+			} else {
+				for _, s := range dbs.subscribersVault[updatedRow.Address] {
+					s.msgs <- []byte(notification.Payload)
+				}
+			}
 			fmt.Println("Received an update on vault_update")
-		case "state_transition":
-			//Push this to all channels (without address as well)
-			fmt.Println("Received an update on state_transition")
 		case "ob_update":
-			fmt.Println("Received an update on ob_update")
+			var updatedRow models.OptionBuyer
+			err := json.Unmarshal([]byte(notification.Payload), &updatedRow)
+			if err != nil {
+				log.Printf("Error parsing ob_update payload: %v", err)
+			} else {
+				for _, vaults := range dbs.subscribersVault {
+					for _, s := range vaults {
+						if s.address == updatedRow.Address && s.userType == "ob" {
+							s.msgs <- []byte(notification.Payload)
+						}
+					}
+				}
+			}
 		case "or_update":
 			fmt.Println("Received an update on or_update")
 			// Parse the JSON payload

@@ -212,11 +212,12 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 
 	if sm.UserType == "lp" {
 
-		// lpState, err := dbs.db.GetLiquidityProviderStateByAddress(s.address)
-		// if err != nil {
-		// 	return err
-		// }
-		// vaultSubscription.LiquidityProviderState = *lpState
+		lpState, err := dbs.db.GetLiquidityProviderStateByAddress(s.address)
+		if err != nil {
+			fmt.Printf("Error fetching lp state %v", err)
+		} else {
+			vaultSubscription.LiquidityProviderState = *lpState
+		}
 	} else if sm.UserType == "ob" {
 
 		obState, err := dbs.db.GetOptionBuyerByAddress(s.address)
@@ -402,7 +403,6 @@ func (dbs *dbServer) listener() {
 			fmt.Println("Received an update on ob_update")
 		case "or_update":
 			fmt.Println("Received an update on or_update")
-			fmt.Printf("notification.Payload %s", notification.Payload)
 			// Parse the JSON payload
 			var updatedRow models.OptionRound
 			err := json.Unmarshal([]byte(notification.Payload), &updatedRow)
@@ -411,9 +411,7 @@ func (dbs *dbServer) listener() {
 			} else {
 				// Print the updated row
 				fmt.Printf("Updated OptionRound: %+v\n", updatedRow)
-				fmt.Printf("Sending to %s", *updatedRow.VaultAddress)
 				for _, s := range dbs.subscribersVault[*updatedRow.VaultAddress] {
-					fmt.Printf("Sending to %+v", s)
 					s.msgs <- []byte(notification.Payload)
 				}
 			}
@@ -422,34 +420,7 @@ func (dbs *dbServer) listener() {
 }
 
 // publishUser sends a message to all subscribers of a specific address.
-func (dbs *dbServer) publishAddress(address string, msg []byte) {
-	dbs.subscribersVaultMu.Lock()
-	defer dbs.subscribersVaultMu.Unlock()
-
-	for _, s := range dbs.subscribersVault[address] {
-		select {
-		case s.msgs <- msg:
-		default:
-			go s.closeSlow()
-		}
-	}
-}
-
 // publishAll sends a message to all subscribers of all addresses.
-func (dbs *dbServer) publishAll(msg []byte) {
-	dbs.subscribersVaultMu.Lock()
-	defer dbs.subscribersVaultMu.Unlock()
-
-	for address := range dbs.subscribersVault {
-		for _, s := range dbs.subscribersVault[address] {
-			select {
-			case s.msgs <- msg:
-			default:
-				go s.closeSlow()
-			}
-		}
-	}
-}
 
 // addSubscriber registers a subscriber.
 func (dbs *dbServer) addSubscriber(s *subscriber, subscriptionType string) {

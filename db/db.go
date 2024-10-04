@@ -209,14 +209,14 @@ func (db *DB) GetAllOptionRounds() ([]models.OptionRound, error) {
 // GetLiquidityProviderStateByID retrieves a LiquidityProviderState record by its Address
 func (db *DB) GetLiquidityProviderStateByAddress(address string) (*models.LiquidityProviderState, error) {
 	var liquidityProviderState models.LiquidityProviderState
-	query := `SELECT address, unlocked_balance, locked_balance, stashed_balance, queued_balance, last_block FROM liquidity_provider_states WHERE address=$1`
+
+	query := `SELECT address, unlocked_balance, locked_balance, stashed_balance, latest_block FROM public."Liquidity_Providers" WHERE address=$1`
 	err := db.Pool.QueryRow(context.Background(), query, address).Scan(
 		&liquidityProviderState.Address,
 		&liquidityProviderState.UnlockedBalance,
 		&liquidityProviderState.LockedBalance,
 		&liquidityProviderState.StashedBalance,
-		&liquidityProviderState.QueuedBalance,
-		&liquidityProviderState.LastBlock,
+		&liquidityProviderState.LatestBlock,
 	)
 	if err != nil {
 		return nil, err
@@ -226,7 +226,7 @@ func (db *DB) GetLiquidityProviderStateByAddress(address string) (*models.Liquid
 
 // GetAllLiquidityProviderStates retrieves all LiquidityProviderState records from the database
 func (db *DB) GetAllLiquidityProviderStates() ([]models.LiquidityProviderState, error) {
-	query := `SELECT address, unlocked_balance, locked_balance, stashed_balance, queued_balance, last_block FROM liquidity_provider_states`
+	query := `SELECT address, unlocked_balance, locked_balance, stashed_balance, last_block FROM liquidity_provider_states`
 	rows, err := db.Pool.Query(context.Background(), query)
 	if err != nil {
 		return nil, err
@@ -241,8 +241,7 @@ func (db *DB) GetAllLiquidityProviderStates() ([]models.LiquidityProviderState, 
 			&liquidityProviderState.UnlockedBalance,
 			&liquidityProviderState.LockedBalance,
 			&liquidityProviderState.StashedBalance,
-			&liquidityProviderState.QueuedBalance,
-			&liquidityProviderState.LastBlock,
+			&liquidityProviderState.LatestBlock,
 		)
 		if err != nil {
 			return nil, err

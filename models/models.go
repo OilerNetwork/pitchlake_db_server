@@ -150,8 +150,7 @@ type LiquidityProviderState struct {
 	UnlockedBalance BigInt `json:"unlocked_balance"`
 	LockedBalance   BigInt `json:"locked_balance"`
 	StashedBalance  BigInt `json:"stashed_balance"`
-	QueuedBalance   BigInt `json:"queued_balance"`
-	LastBlock       BigInt `json:"last_block"`
+	LatestBlock     BigInt `json:"last_block"`
 }
 
 type Bid struct {

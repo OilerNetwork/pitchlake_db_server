@@ -168,5 +168,5 @@ type VaultSubscription struct {
 	LiquidityProviderState LiquidityProviderState `json:"liquidity_provider_state"`
 	OptionBuyerState       OptionBuyer            `json:"option_buyer_state"`
 	VaultState             VaultState             `json:"vault_state"`
-	OptionRoundState       OptionRound            `json:"option_round_state"`
+	OptionRoundStates      []*OptionRound         `json:"option_round_state"`
 }

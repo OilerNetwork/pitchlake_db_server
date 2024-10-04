@@ -184,12 +184,17 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 	mu.Unlock()
 	defer c.CloseNow()
 
-	println("CP6")
 	//Send initial payload here
 	var vaultSubscription models.VaultSubscription
-	println("s.address %s", s.address)
 	vaultState, err := dbs.db.GetVaultStateByID(s.vaultAddress)
-
+	if err != nil {
+		return err
+	}
+	optionRounds, err := dbs.db.GetOptionRoundsByVaultAddress(s.vaultAddress)
+	if err != nil {
+		return err
+	}
+	vaultSubscription.OptionRoundStates = optionRounds
 	// if sm.OptionRound != 0 {
 	// 	optionRoundState, err := dbs.db.GetOptionRoundByID(sm.OptionRound)
 	// 	if err != nil {
@@ -206,9 +211,6 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 	//@note replace this to fetch all option rounds for the vault
 
 	vaultSubscription.VaultState = *vaultState
-	if err != nil {
-		return err
-	}
 
 	if sm.UserType == "lp" {
 

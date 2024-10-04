@@ -74,6 +74,50 @@ func (db *DB) GetVaultStateByID(id string) (*models.VaultState, error) {
 	return &vaultState, nil
 }
 
+func (db *DB) GetOptionRoundsByVaultAddress(vaultAddress string) ([]*models.OptionRound, error) {
+
+	var optionRounds []*models.OptionRound
+	query := `SELECT address, round_id, cap_level, starting_block, ending_block, settlement_date, starting_liquidity, queued_liquidity, available_options, settlement_price, strike_price, sold_options, clearing_price, state, premiums, payout_per_option FROM option_rounds WHERE address=$1`
+
+	rows, err := db.Pool.Query(context.Background(), query, vaultAddress)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		optionRound := &models.OptionRound{}
+		err := rows.Scan(
+			&optionRound.Address,
+			&optionRound.RoundID,
+			&optionRound.CapLevel,
+			&optionRound.StartDate,
+			&optionRound.EndDate,
+			&optionRound.SettlementDate,
+			&optionRound.StartingLiquidity,
+			&optionRound.QueuedLiquidity,
+			&optionRound.AvailableOptions,
+			&optionRound.SettlementPrice,
+			&optionRound.StrikePrice,
+			&optionRound.SoldOptions,
+			&optionRound.ClearingPrice,
+			&optionRound.State,
+			&optionRound.Premiums,
+			&optionRound.PayoutPerOption,
+		)
+		if err != nil {
+			return nil, err
+		}
+		optionRounds = append(optionRounds, optionRound)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return optionRounds, nil
+}
+
 // GetAllVaultStates retrieves all VaultState records from the database
 func (db *DB) GetAllVaultStates() ([]models.VaultState, error) {
 	query := `SELECT current_round, current_round_address, unlocked_balance, locked_balance, stashed_balance, address, last_block FROM vault_states`

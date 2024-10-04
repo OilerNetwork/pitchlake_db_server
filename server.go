@@ -188,7 +188,7 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 	//Send initial payload here
 	var vaultSubscription models.VaultSubscription
 	println("s.address %s", s.address)
-	vaultState, err := dbs.db.GetVaultStateByID(s.address)
+	vaultState, err := dbs.db.GetVaultStateByID(s.vaultAddress)
 
 	// if sm.OptionRound != 0 {
 	// 	optionRoundState, err := dbs.db.GetOptionRoundByID(sm.OptionRound)
@@ -212,11 +212,11 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 
 	if sm.UserType == "lp" {
 
-		lpState, err := dbs.db.GetLiquidityProviderStateByAddress(s.address)
-		if err != nil {
-			return err
-		}
-		vaultSubscription.LiquidityProviderState = *lpState
+		// lpState, err := dbs.db.GetLiquidityProviderStateByAddress(s.address)
+		// if err != nil {
+		// 	return err
+		// }
+		// vaultSubscription.LiquidityProviderState = *lpState
 	} else if sm.UserType == "ob" {
 
 		obState, err := dbs.db.GetOptionBuyerByAddress(s.address)
@@ -234,6 +234,7 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 		return err
 	}
 	println("CP7")
+	writeTimeout(ctx, time.Second*5, c, jsonPayload)
 	go func() {
 		for {
 			_, msg, err := c.Read(ctx)
@@ -401,6 +402,7 @@ func (dbs *dbServer) listener() {
 			fmt.Println("Received an update on ob_update")
 		case "or_update":
 			fmt.Println("Received an update on or_update")
+			fmt.Printf("notification.Payload %s", notification.Payload)
 			// Parse the JSON payload
 			var updatedRow models.OptionRound
 			err := json.Unmarshal([]byte(notification.Payload), &updatedRow)
@@ -409,7 +411,9 @@ func (dbs *dbServer) listener() {
 			} else {
 				// Print the updated row
 				fmt.Printf("Updated OptionRound: %+v\n", updatedRow)
-				for _, s := range dbs.subscribersVault[updatedRow.VaultAddress] {
+				fmt.Printf("Sending to %s", *updatedRow.VaultAddress)
+				for _, s := range dbs.subscribersVault[*updatedRow.VaultAddress] {
+					fmt.Printf("Sending to %+v", s)
 					s.msgs <- []byte(notification.Payload)
 				}
 			}

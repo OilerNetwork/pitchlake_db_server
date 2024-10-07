@@ -95,78 +95,74 @@ func (b BigInt) String() string {
 }
 
 type Vault struct {
-	BlockNumber     BigInt `json:"block_number"`
-	UnlockedBalance BigInt `json:"unlocked_balance"`
-	LockedBalance   BigInt `json:"locked_balance"`
-	StashedBalance  BigInt `json:"stashed_balance"`
+	BlockNumber     BigInt `json:"blockNumber"`
+	UnlockedBalance BigInt `json:"unlockedBalance"`
+	LockedBalance   BigInt `json:"lockedBalance"`
+	StashedBalance  BigInt `json:"stashedBalance"`
 }
 
 type LiquidityProvider struct {
 	Address         string `json:"address"`
-	UnlockedBalance BigInt `json:"unlocked_balance"`
-	LockedBalance   BigInt `json:"locked_balance"`
-	StashedBalance  BigInt `json:"stashed_balance"`
+	UnlockedBalance BigInt `json:"unlockedBalance"`
+	LockedBalance   BigInt `json:"lockedBalance"`
+	StashedBalance  BigInt `json:"stashedBalance"`
 }
 
 type OptionBuyer struct {
 	Address            string `json:"address"`
-	RoundID            BigInt `json:"round_id"`
-	TokenizableOptions BigInt `json:"tokenizable_options"`
-	RefundableBalance  BigInt `json:"refundable_balance"`
+	RoundID            BigInt `json:"roundId"`
+	TokenizableOptions BigInt `json:"tokenizableOptions"`
+	RefundableBalance  BigInt `json:"refundableBalance"`
 }
 
 type OptionRound struct {
 	Address           *string `json:"address"`
-	RoundID           *BigInt `json:"round_id"`
-	CapLevel          *BigInt `json:"cap_level"`
-	StartDate         *string `json:"start_date"`
-	EndDate           *string `json:"end_date"`
-	SettlementDate    *string `json:"settlement_date"`
-	StartingLiquidity *BigInt `json:"starting_liquidity"`
-	AvailableOptions  *BigInt `json:"available_options"`
-	ClearingPrice     *BigInt `json:"clearing_price"`
-	SettlementPrice   *BigInt `json:"settlement_price"`
-	StrikePrice       *BigInt `json:"strike_price"`
-	SoldOptions       *BigInt `json:"sold_options"`
-	State             *string `json:"state"`
+	RoundID           *BigInt `json:"roundId"`
+	CapLevel          *BigInt `json:"capLevel"`
+	AuctionStartDate  *string `json:"auctionStartDate"`
+	AuctionEndDate    *string `json:"auctionEndDate"`
+	OptionSettleDate  *string `json:"optionSettleDate"`
+	StartingLiquidity *BigInt `json:"startingLiquidity"`
+	AvailableOptions  *BigInt `json:"availableOptions"`
+	ClearingPrice     *BigInt `json:"clearingPrice"`
+	SettlementPrice   *BigInt `json:"settlementPrice"`
+	StrikePrice       *BigInt `json:"strikePrice"`
+	OptionsSold       *BigInt `json:"optionsSold"`
+	RoundState        *string `json:"roundState"`
 	Premiums          *BigInt `json:"premiums"`
-	QueuedLiquidity   *BigInt `json:"queued_liquidity"`
-	PayoutPerOption   *BigInt `json:"payout_per_option"`
-	VaultAddress      *string `json:"vault_address"`
+	QueuedLiquidity   *BigInt `json:"queuedLiquidity"`
+	PayoutPerOption   *BigInt `json:"payoutPerOption"`
+	VaultAddress      *string `json:"vaultAddress"`
 }
 
 type VaultState struct {
-	CurrentRound        BigInt `json:"current_round"`
-	CurrentRoundAddress string `json:"current_round_address"`
-	UnlockedBalance     BigInt `json:"unlocked_balance"`
-	LockedBalance       BigInt `json:"locked_balance"`
-	StashedBalance      BigInt `json:"stashed_balance"`
-	Address             string `json:"address"`
-	LatestBlock         BigInt `json:"last_block"`
+	CurrentRound          BigInt `json:"currentRound"`
+	CurrentRoundAddress   string `json:"currentRoundAddress"`
+	UnlockedBalance       BigInt `json:"unlockedBalance"`
+	LockedBalance         BigInt `json:"lockedBalance"`
+	StashedBalance        BigInt `json:"stashedBalance"`
+	Address               string `json:"address"`
+	LatestBlock           BigInt `json:"lastBlock"`
+	AuctionRunTime        BigInt `json:"auctionRunTime"`
+	OptionRunTime         BigInt `json:"optionRunTime"`
+	RoundTransitionPeriod BigInt `json:"roundTransitionPeriod"`
 }
 
 type LiquidityProviderState struct {
 	Address         string `json:"address"`
-	UnlockedBalance BigInt `json:"unlocked_balance"`
-	LockedBalance   BigInt `json:"locked_balance"`
-	StashedBalance  BigInt `json:"stashed_balance"`
-	LatestBlock     BigInt `json:"last_block"`
+	UnlockedBalance BigInt `json:"unlockedBalance"`
+	LockedBalance   BigInt `json:"lockedBalance"`
+	StashedBalance  BigInt `json:"stashedBalance"`
+	LatestBlock     BigInt `json:"lastBlock"`
 }
 
 type Bid struct {
 	Address   string `json:"address"`
-	RoundID   BigInt `json:"round_id"`
-	BidID     string `json:"bid_id"`
-	TreeNonce string `json:"tree_nonce"`
+	RoundID   BigInt `json:"roundId"`
+	BidID     string `json:"bidId"`
+	TreeNonce string `json:"treeNonce"`
 	Amount    BigInt `json:"amount"`
 	Price     BigInt `json:"price"`
 }
 type Position struct {
-}
-
-type VaultSubscription struct {
-	LiquidityProviderState LiquidityProviderState `json:"liquidity_provider_state"`
-	OptionBuyerState       OptionBuyer            `json:"option_buyer_state"`
-	VaultState             VaultState             `json:"vault_state"`
-	OptionRoundStates      []*OptionRound         `json:"option_round_state"`
 }

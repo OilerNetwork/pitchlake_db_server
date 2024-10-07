@@ -63,6 +63,14 @@ type subscriberMessage struct {
 	OptionRound  uint64 `json:"optionRound"`
 }
 
+type webSocketPayload struct {
+	PayloadType            string                        `json:"payloadType"`
+	LiquidityProviderState models.LiquidityProviderState `json:"liquidityProviderState"`
+	OptionBuyerState       models.OptionBuyer            `json:"optionBuyerState"`
+	VaultState             models.VaultState             `json:"vaultState"`
+	OptionRoundStates      []*models.OptionRound         `json:"optionRoundState"`
+}
+
 // newdbServer constructs a dbServer with the defaults.
 // Create a custom context for the server here and pass it to the db package
 func newDBServer(ctx context.Context) *dbServer {
@@ -185,7 +193,9 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 	defer c.CloseNow()
 
 	//Send initial payload here
-	var vaultSubscription models.VaultSubscription
+	var payload webSocketPayload
+
+	payload.PayloadType = "initial"
 	vaultState, err := dbs.db.GetVaultStateByID(s.vaultAddress)
 	if err != nil {
 		return err
@@ -194,7 +204,7 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 	if err != nil {
 		return err
 	}
-	vaultSubscription.OptionRoundStates = optionRounds
+	payload.OptionRoundStates = optionRounds
 	// if sm.OptionRound != 0 {
 	// 	optionRoundState, err := dbs.db.GetOptionRoundByID(sm.OptionRound)
 	// 	if err != nil {
@@ -210,7 +220,7 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 	// }
 	//@note replace this to fetch all option rounds for the vault
 
-	vaultSubscription.VaultState = *vaultState
+	payload.VaultState = *vaultState
 
 	if sm.UserType == "lp" {
 
@@ -218,7 +228,7 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 		if err != nil {
 			fmt.Printf("Error fetching lp state %v", err)
 		} else {
-			vaultSubscription.LiquidityProviderState = *lpState
+			payload.LiquidityProviderState = *lpState
 		}
 	} else if sm.UserType == "ob" {
 
@@ -226,17 +236,16 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 		if err != nil {
 			return err
 		}
-		vaultSubscription.OptionBuyerState = *obState
+		payload.OptionBuyerState = *obState
 	} else {
 		return errors.New("invalid user type")
 	}
 
 	// Marshal the VaultState to a JSON byte array
-	jsonPayload, err := json.Marshal(vaultSubscription)
+	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
-	println("CP7")
 	writeTimeout(ctx, time.Second*5, c, jsonPayload)
 	go func() {
 		for {
@@ -475,7 +484,6 @@ func (dbs *dbServer) addSubscriber(s *subscriber, subscriptionType string) {
 
 // deleteSubscriber deletes the given subscriber.
 func (dbs *dbServer) deleteSubscriber(s *subscriber, subscriptionType string) {
-	println("CPBEFORE")
 	if subscriptionType == "Vault" {
 		dbs.subscribersVaultMu.Lock()
 		defer dbs.subscribersVaultMu.Unlock()

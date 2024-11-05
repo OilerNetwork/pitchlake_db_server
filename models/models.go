@@ -126,6 +126,7 @@ type OptionRound struct {
 	AvailableOptions  *BigInt `json:"availableOptions"`
 	ClearingPrice     *BigInt `json:"clearingPrice"`
 	SettlementPrice   *BigInt `json:"settlementPrice"`
+	ReservePrice      *BigInt `json:"reservePrice"`
 	StrikePrice       *BigInt `json:"strikePrice"`
 	OptionsSold       *BigInt `json:"optionsSold"`
 	RoundState        *string `json:"roundState"`
@@ -136,7 +137,7 @@ type OptionRound struct {
 }
 
 type VaultState struct {
-	CurrentRound          BigInt `json:"currentRound"`
+	CurrentRound          BigInt `json:"currentRoundId"`
 	CurrentRoundAddress   string `json:"currentRoundAddress"`
 	UnlockedBalance       BigInt `json:"unlockedBalance"`
 	LockedBalance         BigInt `json:"lockedBalance"`

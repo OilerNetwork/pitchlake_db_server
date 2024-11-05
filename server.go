@@ -68,7 +68,7 @@ type webSocketPayload struct {
 	LiquidityProviderState models.LiquidityProviderState `json:"liquidityProviderState"`
 	OptionBuyerState       models.OptionBuyer            `json:"optionBuyerState"`
 	VaultState             models.VaultState             `json:"vaultState"`
-	OptionRoundStates      []*models.OptionRound         `json:"optionRoundState"`
+	OptionRoundStates      []*models.OptionRound         `json:"optionRoundStates"`
 }
 
 // newdbServer constructs a dbServer with the defaults.
@@ -376,11 +376,6 @@ func (dbs *dbServer) listener() {
 		log.Fatal(err)
 	}
 
-	_, err = dbs.db.Conn.Exec(context.Background(), "LISTEN state_transition")
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	_, err = dbs.db.Conn.Exec(context.Background(), "LISTEN ob_update")
 	if err != nil {
 		log.Fatal(err)
@@ -464,7 +459,6 @@ func (dbs *dbServer) listener() {
 
 // addSubscriber registers a subscriber.
 func (dbs *dbServer) addSubscriber(s *subscriber, subscriptionType string) {
-	println("CP3")
 	if subscriptionType == "Vault" {
 		dbs.subscribersVaultMu.Lock()
 		defer dbs.subscribersVaultMu.Unlock()

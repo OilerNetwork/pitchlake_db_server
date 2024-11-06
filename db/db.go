@@ -77,14 +77,13 @@ func (db *DB) GetVaultStateByID(id string) (*models.VaultState, error) {
 func (db *DB) GetOptionRoundsByVaultAddress(vaultAddress string) ([]*models.OptionRound, error) {
 
 	var optionRounds []*models.OptionRound
-	query := `SELECT address, round_id, cap_level, start_date, end_date, settlement_date, starting_liquidity, queued_liquidity, available_options, settlement_price, strike_price, sold_options, clearing_price, state, premiums, payout_per_option FROM public."Option_Rounds" WHERE vault_address=$1`
+	query := `SELECT address, round_id, cap_level, start_date, end_date, settlement_date, starting_liquidity, queued_liquidity, available_options, reserve_price, settlement_price, strike_price, sold_options, clearing_price, state, premiums, payout_per_option FROM public."Option_Rounds" WHERE vault_address=$1`
 
 	rows, err := db.Pool.Query(context.Background(), query, vaultAddress)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-
 	for rows.Next() {
 		optionRound := &models.OptionRound{}
 		err := rows.Scan(
@@ -97,6 +96,7 @@ func (db *DB) GetOptionRoundsByVaultAddress(vaultAddress string) ([]*models.Opti
 			&optionRound.StartingLiquidity,
 			&optionRound.QueuedLiquidity,
 			&optionRound.AvailableOptions,
+			&optionRound.ReservePrice,
 			&optionRound.SettlementPrice,
 			&optionRound.StrikePrice,
 			&optionRound.OptionsSold,
@@ -108,6 +108,7 @@ func (db *DB) GetOptionRoundsByVaultAddress(vaultAddress string) ([]*models.Opti
 		if err != nil {
 			return nil, err
 		}
+		fmt.Printf("ROUND %v", optionRound)
 		optionRounds = append(optionRounds, optionRound)
 	}
 

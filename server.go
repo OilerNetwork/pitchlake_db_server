@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/joho/godotenv"
 )
 
 // dbServer enables broadcasting to a set of subscribers.
@@ -68,7 +69,7 @@ type webSocketPayload struct {
 	LiquidityProviderState models.LiquidityProviderState `json:"liquidityProviderState"`
 	OptionBuyerState       models.OptionBuyer            `json:"optionBuyerState"`
 	VaultState             models.VaultState             `json:"vaultState"`
-	OptionRoundStates      []*models.OptionRound         `json:"optionRoundState"`
+	OptionRoundStates      []*models.OptionRound         `json:"optionRoundStates"`
 }
 
 // newdbServer constructs a dbServer with the defaults.
@@ -145,8 +146,10 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 	var closed bool
 	//Extract address from the request and add here
 
+	var envFile, _ = godotenv.Read(".env")
+	allowedOrigin := envFile["APP_URL"]
 	c2, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		OriginPatterns: []string{"localhost:3000"},
+		OriginPatterns: []string{allowedOrigin},
 	})
 	if err != nil {
 		return err
@@ -376,11 +379,6 @@ func (dbs *dbServer) listener() {
 		log.Fatal(err)
 	}
 
-	_, err = dbs.db.Conn.Exec(context.Background(), "LISTEN state_transition")
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	_, err = dbs.db.Conn.Exec(context.Background(), "LISTEN ob_update")
 	if err != nil {
 		log.Fatal(err)
@@ -464,7 +462,6 @@ func (dbs *dbServer) listener() {
 
 // addSubscriber registers a subscriber.
 func (dbs *dbServer) addSubscriber(s *subscriber, subscriptionType string) {
-	println("CP3")
 	if subscriptionType == "Vault" {
 		dbs.subscribersVaultMu.Lock()
 		defer dbs.subscribersVaultMu.Unlock()

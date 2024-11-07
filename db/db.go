@@ -4,15 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"pitchlake-backend/models"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/joho/godotenv"
 )
-
-var envFile, _ = godotenv.Read(".env")
 
 type DB struct {
 	Conn *pgx.Conn
@@ -20,7 +18,7 @@ type DB struct {
 }
 
 func (db *DB) Init() error {
-	connStr := envFile["DB_URL"]
+	connStr := os.Getenv("DB_URL")
 	config, err := pgxpool.ParseConfig(connStr)
 	if err != nil {
 		return fmt.Errorf("unable to parse connection string: %w", err)

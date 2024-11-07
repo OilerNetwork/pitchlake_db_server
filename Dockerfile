@@ -16,14 +16,9 @@ RUN apt-get -qq update && \
     COPY . .
     
     RUN go build -o /websocket
-     
-    FROM alpine:latest as run
-    
-    # Copy the application executable from the build image
   
 
 
-# Stage 2: Run Juno with the plugin
 FROM ubuntu:24.10
 
 # Install necessary runtime dependencies
@@ -32,10 +27,8 @@ RUN apt-get -qq update && \
 
 WORKDIR /app
 
-# Copy the Juno binary and the plugin from the build stage
 COPY --from=build /websocket /websocket
 COPY .env ./
 
 EXPOSE 8080
 CMD ["/websocket"]
-# Run Juno with the plugin

@@ -8,13 +8,13 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"os"
 	"pitchlake-backend/db"
 	"pitchlake-backend/models"
 	"sync"
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/joho/godotenv"
 )
 
 // dbServer enables broadcasting to a set of subscribers.
@@ -146,7 +146,8 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 	var closed bool
 	//Extract address from the request and add here
 
-	allowedOrigin := os.Getenv("APP_URL")
+	var envFile, _ = godotenv.Read(".env")
+	allowedOrigin := envFile["APP_URL"]
 	c2, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		OriginPatterns: []string{allowedOrigin},
 	})
@@ -448,8 +449,11 @@ func (dbs *dbServer) listener() {
 			} else {
 				// Print the updated row
 				fmt.Printf("Updated OptionRound: %+v\n", updatedRow)
-				for _, s := range dbs.subscribersVault[*updatedRow.VaultAddress] {
-					s.msgs <- []byte(notification.Payload)
+				if dbs.subscribersVault[*updatedRow.VaultAddress] != nil {
+
+					for _, s := range dbs.subscribersVault[*updatedRow.VaultAddress] {
+						s.msgs <- []byte(notification.Payload)
+					}
 				}
 			}
 		}

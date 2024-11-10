@@ -4,13 +4,15 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"pitchlake-backend/models"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 )
+
+var envFile, _ = godotenv.Read(".env")
 
 type DB struct {
 	Conn *pgx.Conn
@@ -18,7 +20,7 @@ type DB struct {
 }
 
 func (db *DB) Init() error {
-	connStr := os.Getenv("DB_URL")
+	connStr := envFile["DB_URL"]
 	config, err := pgxpool.ParseConfig(connStr)
 	if err != nil {
 		return fmt.Errorf("unable to parse connection string: %w", err)
@@ -75,7 +77,19 @@ func (db *DB) GetVaultStateByID(id string) (*models.VaultState, error) {
 func (db *DB) GetOptionRoundsByVaultAddress(vaultAddress string) ([]*models.OptionRound, error) {
 
 	var optionRounds []*models.OptionRound
-	query := `SELECT address, round_id, cap_level, start_date, end_date, settlement_date, starting_liquidity, queued_liquidity, available_options, reserve_price, settlement_price, strike_price, sold_options, clearing_price, state, premiums, payout_per_option FROM public."Option_Rounds" WHERE vault_address=$1`
+	query :=
+		`
+	SELECT 
+    address, round_id, cap_level, start_date, end_date, settlement_date, 
+    starting_liquidity, queued_liquidity, available_options, reserve_price, 
+    settlement_price, strike_price, sold_options, clearing_price, state, 
+    premiums, payout_per_option 
+	FROM 
+		public."Option_Rounds" 
+	WHERE 
+		vault_address = $1 
+	ORDER BY 
+		round_id ASC;`
 
 	rows, err := db.Pool.Query(context.Background(), query, vaultAddress)
 	if err != nil {

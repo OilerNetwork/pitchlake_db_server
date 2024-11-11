@@ -4,15 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"pitchlake-backend/models"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/joho/godotenv"
 )
-
-var envFile, _ = godotenv.Read(".env")
 
 type DB struct {
 	Conn *pgx.Conn
@@ -20,7 +18,7 @@ type DB struct {
 }
 
 func (db *DB) Init() error {
-	connStr := envFile["DB_URL"]
+	connStr := os.Getenv("DB_URL")
 	config, err := pgxpool.ParseConfig(connStr)
 	if err != nil {
 		return fmt.Errorf("unable to parse connection string: %w", err)
@@ -218,6 +216,33 @@ func (db *DB) GetOptionRoundByAddress(address string) (*models.OptionRound, erro
 		return nil, err
 	}
 	return &optionRound, nil
+}
+func (db *DB) GetVaultAddresses() ([]string, error) {
+	var vaultAddresses []string
+
+	query := `
+	SELECT address 
+	FROM public."VaultState" ;`
+
+	rows, err := db.Pool.Query(context.Background(), query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var address string
+		if err := rows.Scan(&address); err != nil {
+			return nil, err
+		}
+		vaultAddresses = append(vaultAddresses, address)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return vaultAddresses, nil
 }
 
 // GetAllOptionRounds retrieves all OptionRound records from the database

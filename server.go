@@ -96,10 +96,15 @@ func newDBServer(ctx context.Context) *dbServer {
 	dbs.serveMux.Handle("/", http.FileServer(http.Dir(".")))
 	dbs.serveMux.HandleFunc("/subscribeHome", dbs.subscribeHomeHandler)
 	dbs.serveMux.HandleFunc("/subscribeVault", dbs.subscribeVaultHandler)
+	dbs.serveMux.HandleFunc("/health", dbs.healthCheck)
 	go dbs.listener()
 	return dbs
 }
 
+func (dbs *dbServer) healthCheck(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK"))
+}
 func (dbs *dbServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	dbs.serveMux.ServeHTTP(w, r)
 }

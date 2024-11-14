@@ -1,5 +1,3 @@
-
-# Stage 1: Build golang dependencies and binaries
 FROM ubuntu:24.10 AS build
 RUN apt-get -qq update && \
     apt-get -qq install golang -y ca-certificates
@@ -18,7 +16,6 @@ RUN apt-get -qq update && \
     RUN go build -o /websocket
   
 
-
 FROM ubuntu:24.10
 
 # Install necessary runtime dependencies
@@ -28,7 +25,6 @@ RUN apt-get -qq update && \
 WORKDIR /app
 
 COPY --from=build /websocket /websocket
-COPY .env ./
 
 EXPOSE 8080
 CMD ["/websocket"]

@@ -39,9 +39,9 @@ type dbServer struct {
 	serveMux http.ServeMux
 
 	subscribersVaultMu sync.Mutex
-	subscribersVault   map[string][]*subscriber
+	subscribersVault   map[string][]*subscriberVault
 	subscribersHomeMu  sync.Mutex
-	subscribersHome    map[*subscriber]struct{}
+	subscribersHome    map[*subscriberHome]struct{}
 	ctx                context.Context
 	cancel             context.CancelFunc
 }
@@ -49,12 +49,17 @@ type dbServer struct {
 // subscriber represents a subscriber.
 // Messages are sent on the msgs channel and if the client
 // cannot keep up with the messages, closeSlow is called.
-type subscriber struct {
+type subscriberVault struct {
 	msgs         chan []byte
 	address      string
 	userType     string
 	vaultAddress string
 	closeSlow    func()
+}
+
+type subscriberHome struct {
+	msgs      chan []byte
+	closeSlow func()
 }
 
 type subscriberMessage struct {
@@ -82,8 +87,8 @@ func newDBServer(ctx context.Context) *dbServer {
 	dbs := &dbServer{
 		subscriberMessageBuffer: 16,
 		logf:                    log.Printf,
-		subscribersVault:        make(map[string][]*subscriber),
-		subscribersHome:         make(map[*subscriber]struct{}),
+		subscribersVault:        make(map[string][]*subscriberVault),
+		subscribersHome:         make(map[*subscriberHome]struct{}),
 		db:                      db,
 		ctx:                     ctx,
 		cancel:                  cancel,
@@ -91,10 +96,15 @@ func newDBServer(ctx context.Context) *dbServer {
 	dbs.serveMux.Handle("/", http.FileServer(http.Dir(".")))
 	dbs.serveMux.HandleFunc("/subscribeHome", dbs.subscribeHomeHandler)
 	dbs.serveMux.HandleFunc("/subscribeVault", dbs.subscribeVaultHandler)
+	dbs.serveMux.HandleFunc("/health", dbs.healthCheck)
 	go dbs.listener()
 	return dbs
 }
 
+func (dbs *dbServer) healthCheck(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK"))
+}
 func (dbs *dbServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	dbs.serveMux.ServeHTTP(w, r)
 }
@@ -168,7 +178,7 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 	}
 	log.Printf("%v", sm)
 
-	s := &subscriber{
+	s := &subscriberVault{
 		address:      sm.Address,
 		vaultAddress: sm.VaultAddress,
 		userType:     sm.UserType,
@@ -182,8 +192,8 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 			}
 		},
 	}
-	dbs.addSubscriber(s, "Vault")
-	defer dbs.deleteSubscriber(s, "Vault")
+	dbs.addSubscriberVault(s)
+	defer dbs.deleteSubscriberVault(s)
 
 	mu.Lock()
 	if closed {
@@ -294,22 +304,9 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 	defer c2.Close(websocket.StatusInternalError, "Internal server error")
 
 	// Read the first message to get the subscription data
-	_, msg, err := c2.Read(ctx)
-	if err != nil {
-		return err
-	}
 
-	var sm subscriberMessage
-	err = json.Unmarshal(msg, &sm)
-	if err != nil {
-		return err
-	}
-	log.Printf("%v", sm)
-
-	s := &subscriber{
-		address:      sm.Address,
-		vaultAddress: sm.VaultAddress,
-		msgs:         make(chan []byte, dbs.subscriberMessageBuffer),
+	s := &subscriberHome{
+		msgs: make(chan []byte, dbs.subscriberMessageBuffer),
 		closeSlow: func() {
 			mu.Lock()
 			defer mu.Unlock()
@@ -321,9 +318,9 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 	}
 
 	// Add the subscriber to the appropriate map based on the address
-	dbs.addSubscriber(s, "Home")
+	dbs.addSubscriberHome(s)
 
-	defer dbs.deleteSubscriber(s, sm.Address)
+	defer dbs.deleteSubscriberHome(s)
 
 	log.Printf("Subscribed to home")
 	mu.Lock()
@@ -336,27 +333,41 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 	defer c.CloseNow()
 	// Send initial payload here
 
-	go func() {
-		for {
-			_, msg, err := c.Read(ctx)
-			if err != nil {
-				log.Printf("Error reading message: %v", err)
-				return
-			}
-			log.Printf("Received message from client: %s", msg)
-			s.msgs <- []byte("RECEIVED")
-			log.Printf("Client Info %v", s.address)
-			// Handle the received message here
-		}
-	}()
+	//@dev Use to read data from the channel
+	// go func() {
+	// 	for {
+	// 		_, msg, err := c.Read(ctx)
+	// 		if err != nil {
+	// 			log.Printf("Error reading message: %v", err)
+	// 			return
+	// 		}
+	// 		log.Printf("Received message from client: %s", msg)
+	// 		s.msgs <- []byte("RECEIVED")
+	// 		// Handle the received message here
+	// 	}
+	// }()
 
+	vaultAddresses, err := dbs.db.GetVaultAddresses()
+	if err != nil {
+		return err
+	}
 	// Send initial payload here
-	writeTimeout(ctx, time.Second*5, c, []byte("subscribed"))
+	response := struct {
+		VaultAddresses []string `json:"vaultAddresses"`
+	}{
+		VaultAddresses: vaultAddresses,
+	}
+	jsonPayload, err := json.Marshal(response)
+	if err != nil {
+		return err
+	}
+
+	writeTimeout(ctx, time.Second*5, c, jsonPayload)
 
 	for {
 		select {
 		case msg := <-s.msgs:
-			log.Printf("HELLO")
+			//Loop to write update messages to client
 			err := writeTimeout(ctx, time.Second*5, c, msg)
 			if err != nil {
 				return err
@@ -448,8 +459,11 @@ func (dbs *dbServer) listener() {
 			} else {
 				// Print the updated row
 				fmt.Printf("Updated OptionRound: %+v\n", updatedRow)
-				for _, s := range dbs.subscribersVault[*updatedRow.VaultAddress] {
-					s.msgs <- []byte(notification.Payload)
+				if dbs.subscribersVault[*updatedRow.VaultAddress] != nil {
+
+					for _, s := range dbs.subscribersVault[*updatedRow.VaultAddress] {
+						s.msgs <- []byte(notification.Payload)
+					}
 				}
 			}
 		}
@@ -460,56 +474,58 @@ func (dbs *dbServer) listener() {
 // publishAll sends a message to all subscribers of all addresses.
 
 // addSubscriber registers a subscriber.
-func (dbs *dbServer) addSubscriber(s *subscriber, subscriptionType string) {
-	if subscriptionType == "Vault" {
-		dbs.subscribersVaultMu.Lock()
-		defer dbs.subscribersVaultMu.Unlock()
+func (dbs *dbServer) addSubscriberVault(s *subscriberVault) {
 
-		// Initialize the slice if it doesn't exist
-		if _, exists := dbs.subscribersVault[s.vaultAddress]; !exists {
-			dbs.subscribersVault[s.vaultAddress] = make([]*subscriber, 0)
-		}
+	dbs.subscribersVaultMu.Lock()
+	defer dbs.subscribersVaultMu.Unlock()
 
-		dbs.subscribersVault[s.vaultAddress] = append(dbs.subscribersVault[s.vaultAddress], s)
-	} else if subscriptionType == "Home" {
-		dbs.subscribersHomeMu.Lock()
-		dbs.subscribersHome[s] = struct{}{}
-		dbs.subscribersHomeMu.Unlock()
+	// Initialize the slice if it doesn't exist
+	if _, exists := dbs.subscribersVault[s.vaultAddress]; !exists {
+		dbs.subscribersVault[s.vaultAddress] = make([]*subscriberVault, 0)
 	}
+
+	dbs.subscribersVault[s.vaultAddress] = append(dbs.subscribersVault[s.vaultAddress], s)
+
+}
+func (dbs *dbServer) addSubscriberHome(s *subscriberHome) {
+
+	dbs.subscribersHomeMu.Lock()
+	dbs.subscribersHome[s] = struct{}{}
+	dbs.subscribersHomeMu.Unlock()
+}
+
+func (dbs *dbServer) deleteSubscriberHome(s *subscriberHome) {
+
+	dbs.subscribersHomeMu.Lock()
+	delete(dbs.subscribersHome, s)
+	dbs.subscribersHomeMu.Unlock()
 }
 
 // deleteSubscriber deletes the given subscriber.
-func (dbs *dbServer) deleteSubscriber(s *subscriber, subscriptionType string) {
-	if subscriptionType == "Vault" {
-		dbs.subscribersVaultMu.Lock()
-		defer dbs.subscribersVaultMu.Unlock()
+func (dbs *dbServer) deleteSubscriberVault(s *subscriberVault) {
 
-		subscribers, exists := dbs.subscribersVault[s.vaultAddress]
-		if !exists {
-			return // Nothing to delete
-		}
+	dbs.subscribersVaultMu.Lock()
+	defer dbs.subscribersVaultMu.Unlock()
 
-		for i, subscriber := range subscribers {
-			if subscriber == s {
-				// Replace the element to be deleted with the last element
-				subscribers[i] = subscribers[len(subscribers)-1]
-				// Truncate the slice
-				dbs.subscribersVault[s.vaultAddress] = subscribers[:len(subscribers)-1]
-				break
-			}
-		}
-
-		// If the slice is empty after deletion, remove the key from the map
-		if len(dbs.subscribersVault[s.vaultAddress]) == 0 {
-			delete(dbs.subscribersVault, s.vaultAddress)
-		}
-	} else if subscriptionType == "Home" {
-		dbs.subscribersHomeMu.Lock()
-		delete(dbs.subscribersHome, s)
-		dbs.subscribersHomeMu.Unlock()
+	subscribers, exists := dbs.subscribersVault[s.vaultAddress]
+	if !exists {
+		return // Nothing to delete
 	}
 
-	println("CPAFTER")
+	for i, subscriber := range subscribers {
+		if subscriber == s {
+			// Replace the element to be deleted with the last element
+			subscribers[i] = subscribers[len(subscribers)-1]
+			// Truncate the slice
+			dbs.subscribersVault[s.vaultAddress] = subscribers[:len(subscribers)-1]
+			break
+		}
+	}
+
+	// If the slice is empty after deletion, remove the key from the map
+	if len(dbs.subscribersVault[s.vaultAddress]) == 0 {
+		delete(dbs.subscribersVault, s.vaultAddress)
+	}
 }
 
 func writeTimeout(ctx context.Context, timeout time.Duration, c *websocket.Conn, msg []byte) error {

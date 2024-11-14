@@ -75,7 +75,19 @@ func (db *DB) GetVaultStateByID(id string) (*models.VaultState, error) {
 func (db *DB) GetOptionRoundsByVaultAddress(vaultAddress string) ([]*models.OptionRound, error) {
 
 	var optionRounds []*models.OptionRound
-	query := `SELECT address, round_id, cap_level, start_date, end_date, settlement_date, starting_liquidity, queued_liquidity, available_options, reserve_price, settlement_price, strike_price, sold_options, clearing_price, state, premiums, payout_per_option FROM public."Option_Rounds" WHERE vault_address=$1`
+	query :=
+		`
+	SELECT 
+    address, round_id, cap_level, start_date, end_date, settlement_date, 
+    starting_liquidity, queued_liquidity, available_options, reserve_price, 
+    settlement_price, strike_price, sold_options, clearing_price, state, 
+    premiums, payout_per_option 
+	FROM 
+		public."Option_Rounds" 
+	WHERE 
+		vault_address = $1 
+	ORDER BY 
+		round_id ASC;`
 
 	rows, err := db.Pool.Query(context.Background(), query, vaultAddress)
 	if err != nil {
@@ -204,6 +216,33 @@ func (db *DB) GetOptionRoundByAddress(address string) (*models.OptionRound, erro
 		return nil, err
 	}
 	return &optionRound, nil
+}
+func (db *DB) GetVaultAddresses() ([]string, error) {
+	var vaultAddresses []string
+
+	query := `
+	SELECT address 
+	FROM public."VaultState" ;`
+
+	rows, err := db.Pool.Query(context.Background(), query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var address string
+		if err := rows.Scan(&address); err != nil {
+			return nil, err
+		}
+		vaultAddresses = append(vaultAddresses, address)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return vaultAddresses, nil
 }
 
 // GetAllOptionRounds retrieves all OptionRound records from the database

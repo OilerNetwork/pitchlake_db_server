@@ -2,7 +2,7 @@ name: Docker Build, Push and Deploy Pitchlake UI
 on:
   push:
     branches:
-      - feat/workflow
+      - main
 
 
 env:

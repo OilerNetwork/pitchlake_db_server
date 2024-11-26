@@ -103,6 +103,7 @@ type Vault struct {
 
 type LiquidityProvider struct {
 	Address         string `json:"address"`
+	BlockNumber     BigInt `json:"blockNumber"`
 	UnlockedBalance BigInt `json:"unlockedBalance"`
 	LockedBalance   BigInt `json:"lockedBalance"`
 	StashedBalance  BigInt `json:"stashedBalance"`

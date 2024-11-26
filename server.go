@@ -459,9 +459,9 @@ func (dbs *dbServer) listener() {
 			} else {
 				// Print the updated row
 				fmt.Printf("Updated OptionRound: %+v\n", updatedRow)
-				if dbs.subscribersVault[*updatedRow.VaultAddress] != nil {
+				if dbs.subscribersVault[updatedRow.VaultAddress] != nil {
 
-					for _, s := range dbs.subscribersVault[*updatedRow.VaultAddress] {
+					for _, s := range dbs.subscribersVault[updatedRow.VaultAddress] {
 						s.msgs <- []byte(notification.Payload)
 					}
 				}

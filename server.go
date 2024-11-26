@@ -294,9 +294,10 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 	var c *websocket.Conn
 	var closed bool
 
+	allowedOrigin := os.Getenv("APP_URL")
 	// Accept the WebSocket connection
 	c2, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		OriginPatterns: []string{"localhost:3000"},
+		OriginPatterns: []string{allowedOrigin},
 	})
 	if err != nil {
 		return err
@@ -331,9 +332,8 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 	c = c2
 	mu.Unlock()
 	defer c.CloseNow()
-	// Send initial payload here
 
-	//@dev Use to read data from the channel
+	//@dev Use if need to read data from the channel
 	// go func() {
 	// 	for {
 	// 		_, msg, err := c.Read(ctx)
@@ -459,9 +459,9 @@ func (dbs *dbServer) listener() {
 			} else {
 				// Print the updated row
 				fmt.Printf("Updated OptionRound: %+v\n", updatedRow)
-				if dbs.subscribersVault[*updatedRow.VaultAddress] != nil {
+				if dbs.subscribersVault[updatedRow.VaultAddress] != nil {
 
-					for _, s := range dbs.subscribersVault[*updatedRow.VaultAddress] {
+					for _, s := range dbs.subscribersVault[updatedRow.VaultAddress] {
 						s.msgs <- []byte(notification.Payload)
 					}
 				}

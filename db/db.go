@@ -166,8 +166,9 @@ func (db *DB) GetAllVaultStates() ([]models.VaultState, error) {
 // GetOptionRoundByID retrieves an OptionRound record by its ID
 func (db *DB) GetOptionRoundByID(id uint64) (*models.OptionRound, error) {
 	var optionRound models.OptionRound
-	query := `SELECT address, round_id, bids, cap_level, starting_block, ending_block, settlement_date, starting_liquidity, queued_liquidity, available_options, settlement_price, strike_price, sold_options, clearing_price, state, premiums, payout_per_option FROM option_rounds WHERE id=$1`
+	query := `SELECT vault_address, address, round_id, bids, cap_level, starting_block, ending_block, settlement_date, starting_liquidity, queued_liquidity, remaining_liquidity, available_options,clearing_price, settlement_price, reserve_price, strike_price, sold_options, unsold_options, state, premiums, payout_per_option FROM option_rounds WHERE id=$1`
 	err := db.Pool.QueryRow(context.Background(), query, id).Scan(
+		&optionRound.VaultAddress,
 		&optionRound.Address,
 		&optionRound.RoundID,
 		&optionRound.CapLevel,
@@ -176,11 +177,14 @@ func (db *DB) GetOptionRoundByID(id uint64) (*models.OptionRound, error) {
 		&optionRound.OptionSettleDate,
 		&optionRound.StartingLiquidity,
 		&optionRound.QueuedLiquidity,
+		&optionRound.RemainingLiquidity,
 		&optionRound.AvailableOptions,
+		&optionRound.ClearingPrice,
 		&optionRound.SettlementPrice,
+		&optionRound.ReservePrice,
 		&optionRound.StrikePrice,
 		&optionRound.OptionsSold,
-		&optionRound.ClearingPrice,
+		&optionRound.UnsoldLiquidity,
 		&optionRound.RoundState,
 		&optionRound.Premiums,
 		&optionRound.PayoutPerOption,
@@ -222,7 +226,7 @@ func (db *DB) GetVaultAddresses() ([]string, error) {
 
 	query := `
 	SELECT address 
-	FROM public."VaultState" ;`
+	FROM "VaultStates" ;`
 
 	rows, err := db.Pool.Query(context.Background(), query)
 	if err != nil {
@@ -308,7 +312,7 @@ func (db *DB) GetLiquidityProviderStateByAddress(address string) (*models.Liquid
 
 // GetAllLiquidityProviderStates retrieves all LiquidityProviderState records from the database
 func (db *DB) GetAllLiquidityProviderStates() ([]models.LiquidityProviderState, error) {
-	query := `SELECT address, unlocked_balance, locked_balance, stashed_balance, last_block FROM liquidity_provider_states`
+	query := `SELECT vault_address, address, unlocked_balance, locked_balance, stashed_balance, last_block FROM liquidity_provider_states`
 	rows, err := db.Pool.Query(context.Background(), query)
 	if err != nil {
 		return nil, err
@@ -319,6 +323,7 @@ func (db *DB) GetAllLiquidityProviderStates() ([]models.LiquidityProviderState, 
 	for rows.Next() {
 		var liquidityProviderState models.LiquidityProviderState
 		err := rows.Scan(
+			&liquidityProviderState.VaultAddress,
 			&liquidityProviderState.Address,
 			&liquidityProviderState.UnlockedBalance,
 			&liquidityProviderState.LockedBalance,
@@ -341,12 +346,14 @@ func (db *DB) GetAllLiquidityProviderStates() ([]models.LiquidityProviderState, 
 // GetOptionBuyerByID retrieves an OptionBuyer record by its Address
 func (db *DB) GetOptionBuyerByAddress(address string) (*models.OptionBuyer, error) {
 	var optionBuyer models.OptionBuyer
-	query := `SELECT address, round_id, tokenizable_options, refundable_balance FROM option_buyers WHERE address=$1`
+	query := `SELECT address, round_address, mintable_options, refundable_options, has_minted, has_refunded FROM option_buyers WHERE address=$1`
 	err := db.Pool.QueryRow(context.Background(), query, address).Scan(
 		&optionBuyer.Address,
-		&optionBuyer.RoundID,
-		&optionBuyer.TokenizableOptions,
-		&optionBuyer.RefundableBalance,
+		&optionBuyer.RoundAddress,
+		&optionBuyer.MintableOptions,
+		&optionBuyer.RefundableOptions,
+		&optionBuyer.HasMinted,
+		&optionBuyer.HasRefunded,
 	)
 	if err != nil {
 		return nil, err
@@ -356,7 +363,7 @@ func (db *DB) GetOptionBuyerByAddress(address string) (*models.OptionBuyer, erro
 
 // GetAllOptionBuyers retrieves all OptionBuyer records from the database
 func (db *DB) GetAllOptionBuyers() ([]models.OptionBuyer, error) {
-	query := `SELECT address, round_id, tokenizable_options, refundable_balance FROM option_buyers`
+	query := `SELECT address, round_address, mintable_options, refundable_options, has_minted, has_refunded FROM option_buyers`
 	rows, err := db.Pool.Query(context.Background(), query)
 	if err != nil {
 		return nil, err
@@ -368,9 +375,11 @@ func (db *DB) GetAllOptionBuyers() ([]models.OptionBuyer, error) {
 		var optionBuyer models.OptionBuyer
 		err := rows.Scan(
 			&optionBuyer.Address,
-			&optionBuyer.RoundID,
-			&optionBuyer.TokenizableOptions,
-			&optionBuyer.RefundableBalance,
+			&optionBuyer.RoundAddress,
+			&optionBuyer.MintableOptions,
+			&optionBuyer.RefundableOptions,
+			&optionBuyer.HasMinted,
+			&optionBuyer.HasRefunded,
 		)
 		if err != nil {
 			return nil, err

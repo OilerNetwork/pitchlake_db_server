@@ -28,7 +28,10 @@ jobs:
 
       # Step to check code formatting
       - name: Check Code Formatting
-        run: go fmt ./...
+        run: |
+          echo "Checking formatting with go fmt..."
+          go fmt ./... || exit 1
+          echo "Formatting checked successfully!"
 
       # Step to build Juno
       - name: Build Package

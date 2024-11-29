@@ -4,7 +4,10 @@ name: Juno Plugin CI
 on:
   push:
     branches:
-      - feat/ci_server
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:
@@ -33,4 +36,3 @@ jobs:
       # Step to build Juno
       - name: Build Package
         run: go mod tidy
-

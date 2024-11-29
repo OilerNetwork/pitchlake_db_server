@@ -34,5 +34,3 @@ jobs:
       - name: Build Package
         run: go mod tidy
 
-      - name: Run package
-        run: go run .

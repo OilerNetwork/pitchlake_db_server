@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"pitchlake-backend/server"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -34,7 +35,7 @@ func run() error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-	dbs := newDBServer(ctx)
+	dbs := server.NewDBServer(ctx)
 	s := &http.Server{
 		Addr:         ":8080",
 		Handler:      dbs,

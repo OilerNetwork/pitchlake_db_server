@@ -62,7 +62,7 @@ func (db *DB) GetVaultStateByID(id string) (*models.VaultState, error) {
 	)
 
 	if err != nil {
-		fmt.Println("Error getting vault state by id %s", err.Error())
+		fmt.Printf("Error getting vault state by id %s", err.Error())
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("no vault state found with id %s", id)
 		}

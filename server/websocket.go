@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -98,25 +97,26 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 	//@note replace this to fetch all option rounds for the vault
 
 	payload.VaultState = *vaultState
-
-	if sm.UserType == "lp" {
-
-		lpState, err := dbs.db.GetLiquidityProviderStateByAddress(s.address)
-		if err != nil {
-			fmt.Printf("Error fetching lp state %v", err)
-		} else {
-			payload.LiquidityProviderState = *lpState
-		}
-	} else if sm.UserType == "ob" {
-
-		obState, err := dbs.db.GetOptionBuyerByAddress(s.address)
-		if err != nil {
-			return err
-		}
-		payload.OptionBuyerState = *obState
+	lpState, err := dbs.db.GetLiquidityProviderStateByAddress(s.address)
+	if err != nil {
+		fmt.Printf("Error fetching lp state %v", err)
 	} else {
-		return errors.New("invalid user type")
+		payload.LiquidityProviderState = *lpState
 	}
+
+	obState, err := dbs.db.GetOptionBuyerByAddress(s.address)
+	if err != nil {
+		return err
+	}
+	payload.OptionBuyerStates = obState
+
+	// if sm.UserType == "lp" {
+
+	// } else if sm.UserType == "ob" {
+
+	// } else {
+	// 	return errors.New("invalid user type")
+	// }
 
 	// Marshal the VaultState to a JSON byte array
 	jsonPayload, err := json.Marshal(payload)
@@ -216,6 +216,7 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 	if err != nil {
 		return err
 	}
+	log.Printf("vaultAddresses %v", vaultAddresses)
 	// Send initial payload here
 	response := struct {
 		VaultAddresses []string `json:"vaultAddresses"`

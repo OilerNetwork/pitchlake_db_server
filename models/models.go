@@ -23,6 +23,7 @@ type OptionBuyer struct {
 	HasMinted         bool   `json:"hasMinted"`
 	HasRefunded       bool   `json:"hasRefunded"`
 	RefundableOptions BigInt `json:"refundableOptions"`
+	Bids              []*Bid `json:"bids"`
 }
 
 type OptionRound struct {
@@ -71,10 +72,10 @@ type LiquidityProviderState struct {
 }
 
 type Bid struct {
-	Address   string `json:"address"`
-	RoundID   BigInt `json:"roundId"`
-	BidID     string `json:"bidId"`
-	TreeNonce string `json:"treeNonce"`
-	Amount    BigInt `json:"amount"`
-	Price     BigInt `json:"price"`
+	BuyerAddress string `json:"address"`
+	RoundAddress BigInt `json:"roundAddress"`
+	BidID        string `json:"bidId"`
+	TreeNonce    string `json:"treeNonce"`
+	Amount       BigInt `json:"amount"`
+	Price        BigInt `json:"price"`
 }

@@ -59,7 +59,7 @@ func (db *DB) GetVaultStateByID(id string) (*models.VaultState, error) {
 		&vaultState.StashedBalance,
 		&vaultState.Address,
 		&vaultState.LatestBlock,
-		&vaultState.DeployementDate,
+		&vaultState.DeploymentDate,
 		&vaultState.FossilClientAddress,
 		&vaultState.EthAddress,
 		&vaultState.OptionRoundClassHash,
@@ -123,7 +123,7 @@ func (db *DB) GetOptionRoundsByVaultAddress(vaultAddress string) ([]*models.Opti
 			&optionRound.RoundState,
 			&optionRound.Premiums,
 			&optionRound.PayoutPerOption,
-			&optionRound.DeployementDate,
+			&optionRound.DeploymentDate,
 		)
 		if err != nil {
 			return nil, err
@@ -195,7 +195,7 @@ func (db *DB) GetOptionRoundByAddress(address string) (*models.OptionRound, erro
 		&optionRound.RoundState,
 		&optionRound.Premiums,
 		&optionRound.PayoutPerOption,
-		&optionRound.DeployementDate,
+		&optionRound.DeploymentDate,
 	)
 	if err != nil {
 		return nil, err

@@ -47,7 +47,7 @@ type OptionRound struct {
 	RoundState         string `json:"roundState"`
 	Premiums           BigInt `json:"premiums"`
 	PayoutPerOption    BigInt `json:"payoutPerOption"`
-	DeployementDate    uint64 `json:"deployementDate"`
+	DeploymentDate     uint64 `json:"deploymentDate"`
 }
 
 type VaultState struct {
@@ -58,7 +58,7 @@ type VaultState struct {
 	StashedBalance        BigInt `json:"stashedBalance"`
 	Address               string `json:"address"`
 	LatestBlock           BigInt `json:"lastBlock"`
-	DeployementDate       uint64 `json:"deployementDate"`
+	DeploymentDate        uint64 `json:"deploymentDate"`
 	FossilClientAddress   string `json:"fossilClientAddress"`
 	EthAddress            string `json:"ethAddress"`
 	OptionRoundClassHash  string `json:"optionRoundClassHash"`

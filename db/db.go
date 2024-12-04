@@ -12,6 +12,20 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type dbInterface interface {
+	Init()
+	GetVaultStateByID(id string) (*models.VaultState, error)
+	GetOptionRoundsByVaultAddress(vaultAddress string) ([]*models.OptionRound, error)
+	GetAllVaultStates() ([]models.VaultState, error)
+	GetOptionRoundByID(id uint64) (*models.OptionRound, error)
+	GetOptionRoundByAddress(address string) (*models.OptionRound, error)
+	GetVaultAddresses() ([]string, error)
+	GetAllOptionRounds() ([]models.OptionRound, error)
+	GetLiquidityProviderStateByAddress(address string) (*models.LiquidityProviderState, error)
+	GetAllLiquidityProviderStates() ([]models.LiquidityProviderState, error)
+	GetOptionBuyerByAddress(address string) (*models.OptionBuyer, error)
+	GetAllOptionBuyers() ([]models.OptionBuyer, error)
+}
 type DB struct {
 	Conn *pgx.Conn
 	Pool *pgxpool.Pool

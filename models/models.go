@@ -57,9 +57,14 @@ type VaultState struct {
 	StashedBalance        BigInt `json:"stashedBalance"`
 	Address               string `json:"address"`
 	LatestBlock           BigInt `json:"lastBlock"`
-	AuctionRunTime        BigInt `json:"auctionRunTime"`
-	OptionRunTime         BigInt `json:"optionRunTime"`
-	RoundTransitionPeriod BigInt `json:"roundTransitionPeriod"`
+	FossilClientAddress   string `json:"fossilClientAddress"`
+	EthAddress            string `json:"ethAddress"`
+	OptionRoundClassHash  string `json:"optionRoundClassHash"`
+	Alpha                 BigInt `json:"alpha"`
+	StrikeLevel           BigInt `json:"strikeLevel"`
+	AuctionRunTime        uint64 `json:"auctionRunTime"`
+	OptionRunTime         uint64 `json:"optionRunTime"`
+	RoundTransitionPeriod uint64 `json:"roundTransitionPeriod"`
 }
 
 type LiquidityProviderState struct {

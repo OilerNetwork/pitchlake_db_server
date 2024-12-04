@@ -49,7 +49,7 @@ func (db *DB) GetVaultStateByID(id string) (*models.VaultState, error) {
 	defer cancel()
 
 	var vaultState models.VaultState
-	query := `SELECT current_round, current_round_address, unlocked_balance, locked_balance, stashed_balance, address, latest_block FROM public."VaultStates" WHERE address=$1`
+	query := `SELECT current_round, current_round_address, unlocked_balance, locked_balance, stashed_balance, address, latest_block, fossil_client_address, eth_address, option_round_class_hash, alpha, strike_level, auction_duration, round_duration, round_transition_period FROM public."VaultStates" WHERE address=$1`
 
 	err := db.Pool.QueryRow(ctx, query, id).Scan(
 		&vaultState.CurrentRound,
@@ -59,6 +59,14 @@ func (db *DB) GetVaultStateByID(id string) (*models.VaultState, error) {
 		&vaultState.StashedBalance,
 		&vaultState.Address,
 		&vaultState.LatestBlock,
+		&vaultState.FossilClientAddress,
+		&vaultState.EthAddress,
+		&vaultState.OptionRoundClassHash,
+		&vaultState.Alpha,
+		&vaultState.StrikeLevel,
+		&vaultState.AuctionRunTime,
+		&vaultState.OptionRunTime,
+		&vaultState.RoundTransitionPeriod,
 	)
 
 	if err != nil {

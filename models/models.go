@@ -23,6 +23,7 @@ type OptionBuyer struct {
 	HasMinted         bool   `json:"hasMinted"`
 	HasRefunded       bool   `json:"hasRefunded"`
 	RefundableOptions BigInt `json:"refundableOptions"`
+	Bids              []*Bid `json:"bids"`
 }
 
 type OptionRound struct {
@@ -46,6 +47,7 @@ type OptionRound struct {
 	RoundState         string `json:"roundState"`
 	Premiums           BigInt `json:"premiums"`
 	PayoutPerOption    BigInt `json:"payoutPerOption"`
+	DeployementDate    uint64 `json:"deployementDate"`
 }
 
 type VaultState struct {
@@ -56,9 +58,15 @@ type VaultState struct {
 	StashedBalance        BigInt `json:"stashedBalance"`
 	Address               string `json:"address"`
 	LatestBlock           BigInt `json:"lastBlock"`
-	AuctionRunTime        BigInt `json:"auctionRunTime"`
-	OptionRunTime         BigInt `json:"optionRunTime"`
-	RoundTransitionPeriod BigInt `json:"roundTransitionPeriod"`
+	DeployementDate       uint64 `json:"deployementDate"`
+	FossilClientAddress   string `json:"fossilClientAddress"`
+	EthAddress            string `json:"ethAddress"`
+	OptionRoundClassHash  string `json:"optionRoundClassHash"`
+	Alpha                 BigInt `json:"alpha"`
+	StrikeLevel           BigInt `json:"strikeLevel"`
+	AuctionRunTime        uint64 `json:"auctionRunTime"`
+	OptionRunTime         uint64 `json:"optionRunTime"`
+	RoundTransitionPeriod uint64 `json:"roundTransitionPeriod"`
 }
 
 type LiquidityProviderState struct {
@@ -71,10 +79,10 @@ type LiquidityProviderState struct {
 }
 
 type Bid struct {
-	Address   string `json:"address"`
-	RoundID   BigInt `json:"roundId"`
-	BidID     string `json:"bidId"`
-	TreeNonce string `json:"treeNonce"`
-	Amount    BigInt `json:"amount"`
-	Price     BigInt `json:"price"`
+	BuyerAddress string `json:"address"`
+	RoundAddress BigInt `json:"roundAddress"`
+	BidID        string `json:"bidId"`
+	TreeNonce    string `json:"treeNonce"`
+	Amount       BigInt `json:"amount"`
+	Price        BigInt `json:"price"`
 }

@@ -49,7 +49,7 @@ func (db *DB) GetVaultStateByID(id string) (*models.VaultState, error) {
 	defer cancel()
 
 	var vaultState models.VaultState
-	query := `SELECT current_round, current_round_address, unlocked_balance, locked_balance, stashed_balance, address, latest_block, deployement_date, fossil_client_address, eth_address, option_round_class_hash, alpha, strike_level, auction_duration, round_duration, round_transition_period FROM public."VaultStates" WHERE address=$1`
+	query := `SELECT current_round, current_round_address, unlocked_balance, locked_balance, stashed_balance, address, latest_block, deployment_date, fossil_client_address, eth_address, option_round_class_hash, alpha, strike_level, auction_duration, round_duration, round_transition_period FROM public."VaultStates" WHERE address=$1`
 
 	err := db.Pool.QueryRow(ctx, query, id).Scan(
 		&vaultState.CurrentRound,
@@ -90,7 +90,7 @@ func (db *DB) GetOptionRoundsByVaultAddress(vaultAddress string) ([]*models.Opti
     address, round_id, cap_level, start_date, end_date, settlement_date, 
     starting_liquidity, queued_liquidity, available_options, reserve_price, 
     settlement_price, strike_price, sold_options, clearing_price, state, 
-    premiums, payout_per_option, deployement_date
+    premiums, payout_per_option, deployment_date
 	FROM 
 		public."Option_Rounds" 
 	WHERE 
@@ -177,7 +177,7 @@ func (db *DB) GetAllVaultStates() ([]models.VaultState, error) {
 
 func (db *DB) GetOptionRoundByAddress(address string) (*models.OptionRound, error) {
 	var optionRound models.OptionRound
-	query := `SELECT address, round_id, bids, cap_level, starting_block, ending_block, settlement_date, starting_liquidity, queued_liquidity, available_options, settlement_price, strike_price, sold_options, clearing_price, state, premiums, payout_per_option, deployement_date FROM option_rounds WHERE address=$1`
+	query := `SELECT address, round_id, bids, cap_level, starting_block, ending_block, settlement_date, starting_liquidity, queued_liquidity, available_options, settlement_price, strike_price, sold_options, clearing_price, state, premiums, payout_per_option, deployment_date FROM option_rounds WHERE address=$1`
 	err := db.Pool.QueryRow(context.Background(), query, address).Scan(
 		&optionRound.Address,
 		&optionRound.RoundID,

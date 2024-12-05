@@ -5,9 +5,10 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
+      - feat/ci_server
+  # pull_request:
+  #   branches:
+  #     - main
 
 jobs:
   build:
@@ -33,6 +34,8 @@ jobs:
           go fmt ./... || exit 1
           echo "Formatting checked successfully!"
 
-      # Step to build Juno
-      - name: Build Package
-        run: go mod tidy
+      - name: Download go module dependencies
+        run: go mod download
+
+      - name: Build module
+        run: go build

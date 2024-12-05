@@ -1,0 +1,32 @@
+name: Juno Plugin CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Building CI pipeline on Ubuntu OS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set Up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.23.1
+
+      - name: Check Code Formatting
+        run: |
+          echo "Checking formatting with go fmt..."
+          go fmt ./... || exit 1
+          echo "Formatting checked successfully!"
+
+      - name: Build module
+        run: go build

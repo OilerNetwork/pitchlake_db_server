@@ -1,41 +1,32 @@
 name: Juno Plugin CI
 
-# Trigger the workflow on push events specifically for the 'master' branch
 on:
   push:
     branches:
       - main
-      - feat/ci_server
-  # pull_request:
-  #   branches:
-  #     - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:
-    # Set the job name and specify it runs on the latest Ubuntu virtual environment
     name: Building CI pipeline on Ubuntu OS
     runs-on: ubuntu-latest
 
     steps:
-      # Step to check out the code from the Git repository so that it can be used in subsequent steps
       - name: Checkout code
         uses: actions/checkout@v2
 
-      # Step to set up Go
       - name: Set Up Go
         uses: actions/setup-go@v4
         with:
           go-version: 1.23.1
 
-      # Step to check code formatting
       - name: Check Code Formatting
         run: |
           echo "Checking formatting with go fmt..."
           go fmt ./... || exit 1
           echo "Formatting checked successfully!"
-
-      # - name: Download go module dependencies
-      #   run: go mod download
 
       - name: Build module
         run: go build

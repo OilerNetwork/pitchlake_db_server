@@ -34,8 +34,8 @@ jobs:
           go fmt ./... || exit 1
           echo "Formatting checked successfully!"
 
-      - name: Download go module dependencies
-        run: go mod download
+      # - name: Download go module dependencies
+      #   run: go mod download
 
       - name: Build module
         run: go build

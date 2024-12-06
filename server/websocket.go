@@ -81,21 +81,6 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 		return err
 	}
 	payload.OptionRoundStates = optionRounds
-	// if sm.OptionRound != 0 {
-	// 	optionRoundState, err := dbs.db.GetOptionRoundByID(sm.OptionRound)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	vaultSubscription.OptionRoundState = *optionRoundState
-	// } else {
-	// 	optionRoundState, err := dbs.db.GetOptionRoundByAddress(vaultState.CurrentRoundAddress)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	vaultSubscription.OptionRoundState = *optionRoundState
-	// }
-	//@note replace this to fetch all option rounds for the vault
-
 	payload.VaultState = *vaultState
 	lpState, err := dbs.db.GetLiquidityProviderStateByAddress(s.address)
 	if err != nil {
@@ -129,17 +114,16 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 			_, msg, err := c.Read(ctx)
 			if err != nil {
 				log.Printf("Error reading message: %v", err)
-				return
+				break
 			}
 			log.Printf("Received message from client: %s", msg)
+
 			//Unmarshall the json here and send the updates respectively
 			s.msgs <- []byte("RECEIVED")
-			log.Printf("Client Info %v", s.address)
+			log.Printf("Client Info %v", s)
 			// Handle the received message here
 		}
 	}()
-
-	dbs.writeTimeout(ctx, time.Second*5, c, jsonPayload)
 	for {
 		select {
 		case msg := <-s.msgs:
@@ -197,20 +181,6 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 	c = c2
 	mu.Unlock()
 	defer c.CloseNow()
-
-	//@dev Use if need to read data from the channel
-	// go func() {
-	// 	for {
-	// 		_, msg, err := c.Read(ctx)
-	// 		if err != nil {
-	// 			log.Printf("Error reading message: %v", err)
-	// 			return
-	// 		}
-	// 		log.Printf("Received message from client: %s", msg)
-	// 		s.msgs <- []byte("RECEIVED")
-	// 		// Handle the received message here
-	// 	}
-	// }()
 
 	vaultAddresses, err := dbs.db.GetVaultAddresses()
 	if err != nil {

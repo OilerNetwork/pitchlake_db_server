@@ -331,34 +331,3 @@ func (db *DB) GetOptionBuyerByAddress(address string) ([]*models.OptionBuyer, er
 }
 
 // GetAllOptionBuyers retrieves all OptionBuyer records from the database
-func (db *DB) GetAllOptionBuyers() ([]models.OptionBuyer, error) {
-	query := `SELECT address, round_address, mintable_options, refundable_amount, has_minted, has_refunded FROM public."Option_Buyers"`
-	rows, err := db.Pool.Query(context.Background(), query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var optionBuyers []models.OptionBuyer
-	for rows.Next() {
-		var optionBuyer models.OptionBuyer
-		err := rows.Scan(
-			&optionBuyer.Address,
-			&optionBuyer.RoundAddress,
-			&optionBuyer.MintableOptions,
-			&optionBuyer.RefundableOptions,
-			&optionBuyer.HasMinted,
-			&optionBuyer.HasRefunded,
-		)
-		if err != nil {
-			return nil, err
-		}
-		optionBuyers = append(optionBuyers, optionBuyer)
-	}
-
-	if rows.Err() != nil {
-		return nil, rows.Err()
-	}
-
-	return optionBuyers, nil
-}

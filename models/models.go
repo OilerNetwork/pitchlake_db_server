@@ -57,7 +57,7 @@ type VaultState struct {
 	LockedBalance         BigInt `json:"lockedBalance"`
 	StashedBalance        BigInt `json:"stashedBalance"`
 	Address               string `json:"address"`
-	LatestBlock           BigInt `json:"lastBlock"`
+	LatestBlock           BigInt `json:"latestBlock"`
 	DeploymentDate        uint64 `json:"deploymentDate"`
 	FossilClientAddress   string `json:"fossilClientAddress"`
 	EthAddress            string `json:"ethAddress"`
@@ -75,7 +75,7 @@ type LiquidityProviderState struct {
 	UnlockedBalance BigInt `json:"unlockedBalance"`
 	LockedBalance   BigInt `json:"lockedBalance"`
 	StashedBalance  BigInt `json:"stashedBalance"`
-	LatestBlock     BigInt `json:"lastBlock"`
+	LatestBlock     BigInt `json:"latestBlock"`
 }
 
 type Bid struct {

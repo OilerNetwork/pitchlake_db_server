@@ -91,7 +91,7 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 
 	obState, err := dbs.db.GetOptionBuyerByAddress(s.address)
 	if err != nil {
-		return err
+		fmt.Printf("Error fetching ob state %v", err)
 	}
 	payload.OptionBuyerStates = obState
 

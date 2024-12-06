@@ -82,7 +82,7 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 	}
 	payload.OptionRoundStates = optionRounds
 	payload.VaultState = *vaultState
-	lpState, err := dbs.db.GetLiquidityProviderStateByAddress(s.address)
+	lpState, err := dbs.db.GetLiquidityProviderStateByAddress(s.address, s.vaultAddress)
 	if err != nil {
 		fmt.Printf("Error fetching lp state %v", err)
 	} else {
@@ -123,25 +123,25 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 				log.Printf("Incorrect message format: %v", err)
 				break
 			}
+			var payload webSocketPayload
 			if request.UpdatedField == "address" {
 				s.address = request.UpdatedValue
-			}
-			var payload webSocketPayload
-			payload.PayloadType = "account_update"
-			lpState, err := dbs.db.GetLiquidityProviderStateByAddress(s.address)
-			if err != nil {
-				fmt.Printf("Error fetching lp state %v", err)
-			} else {
-				payload.LiquidityProviderState = *lpState
-			}
 
-			obStates, err := dbs.db.GetOptionBuyerByAddress(s.address)
-			if err != nil {
-				fmt.Printf("Error fetching ob state %v", err)
+				payload.PayloadType = "account_update"
+				lpState, err := dbs.db.GetLiquidityProviderStateByAddress(s.address, s.vaultAddress)
+				if err != nil {
+					fmt.Printf("Error fetching lp state %v", err)
+				} else {
+					payload.LiquidityProviderState = *lpState
+				}
+
+				obStates, err := dbs.db.GetOptionBuyerByAddress(s.address)
+				if err != nil {
+					fmt.Printf("Error fetching ob state %v", err)
+				}
+				payload.OptionBuyerStates = obStates
 			}
-			payload.OptionBuyerStates = obStates
 			jsonPayload, err := json.Marshal(payload)
-
 			if err != nil {
 				log.Printf("Incorrect response generated: %v", err)
 			}

@@ -231,12 +231,13 @@ func (db *DB) GetVaultAddresses() ([]string, error) {
 }
 
 // GetLiquidityProviderStateByID retrieves a LiquidityProviderState record by its Address
-func (db *DB) GetLiquidityProviderStateByAddress(address string) (*models.LiquidityProviderState, error) {
+func (db *DB) GetLiquidityProviderStateByAddress(address, vaultAddress string) (*models.LiquidityProviderState, error) {
 	var liquidityProviderState models.LiquidityProviderState
 
-	query := `SELECT address, unlocked_balance, locked_balance, stashed_balance, latest_block FROM public."Liquidity_Providers" WHERE address=$1`
-	err := db.Pool.QueryRow(context.Background(), query, address).Scan(
+	query := `SELECT address, vault_address, unlocked_balance, locked_balance, stashed_balance, latest_block FROM public."Liquidity_Providers" WHERE address=$1 AND vault_address=$2`
+	err := db.Pool.QueryRow(context.Background(), query, address, vaultAddress).Scan(
 		&liquidityProviderState.Address,
+		&liquidityProviderState.VaultAddress,
 		&liquidityProviderState.UnlockedBalance,
 		&liquidityProviderState.LockedBalance,
 		&liquidityProviderState.StashedBalance,

@@ -89,11 +89,11 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 		payload.LiquidityProviderState = *lpState
 	}
 
-	obState, err := dbs.db.GetOptionBuyerByAddress(s.address)
+	obStates, err := dbs.db.GetOptionBuyerByAddress(s.address)
 	if err != nil {
 		fmt.Printf("Error fetching ob state %v", err)
 	}
-	payload.OptionBuyerStates = obState
+	payload.OptionBuyerStates = obStates
 
 	// if sm.UserType == "lp" {
 
@@ -111,15 +111,41 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 	dbs.writeTimeout(ctx, time.Second*5, c, jsonPayload)
 	go func() {
 		for {
+			var request subscriberVaultRequest
 			_, msg, err := c.Read(ctx)
 			if err != nil {
 				log.Printf("Error reading message: %v", err)
 				break
 			}
 			log.Printf("Received message from client: %s", msg)
+			err = json.Unmarshal(msg, &request)
+			if err != nil {
+				log.Printf("Incorrect message format: %v", err)
+				break
+			}
+			if request.UpdatedField == "address" {
+				s.address = request.UpdatedValue
+			}
+			var payload webSocketPayload
+			payload.PayloadType = "account_update"
+			lpState, err := dbs.db.GetLiquidityProviderStateByAddress(s.address)
+			if err != nil {
+				fmt.Printf("Error fetching lp state %v", err)
+			} else {
+				payload.LiquidityProviderState = *lpState
+			}
 
-			//Unmarshall the json here and send the updates respectively
-			s.msgs <- []byte("RECEIVED")
+			obStates, err := dbs.db.GetOptionBuyerByAddress(s.address)
+			if err != nil {
+				fmt.Printf("Error fetching ob state %v", err)
+			}
+			payload.OptionBuyerStates = obStates
+			jsonPayload, err := json.Marshal(payload)
+
+			if err != nil {
+				log.Printf("Incorrect response generated: %v", err)
+			}
+			s.msgs <- []byte(jsonPayload)
 			log.Printf("Client Info %v", s)
 			// Handle the received message here
 		}

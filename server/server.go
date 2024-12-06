@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"pitchlake-backend/db"
@@ -62,6 +61,10 @@ type subscriberMessage struct {
 	OptionRound  uint64 `json:"optionRound"`
 }
 
+type subscriberVaultRequest struct {
+	UpdatedField string `json:"updatedField"`
+	UpdatedValue string `json:"updatedValue"`
+}
 type webSocketPayload struct {
 	PayloadType            string                        `json:"payloadType"`
 	LiquidityProviderState models.LiquidityProviderState `json:"liquidityProviderState"`
@@ -110,7 +113,6 @@ func (dbs *dbServer) addSubscriberVault(s *subscriberVault) {
 	}
 
 	dbs.subscribersVault[s.vaultAddress] = append(dbs.subscribersVault[s.vaultAddress], s)
-	fmt.Printf("CHECK ME %v", *dbs.subscribersVault[s.vaultAddress][0])
 
 }
 func (dbs *dbServer) addSubscriberHome(s *subscriberHome) {
@@ -130,7 +132,6 @@ func (dbs *dbServer) deleteSubscriberHome(s *subscriberHome) {
 // deleteSubscriber deletes the given subscriber.
 func (dbs *dbServer) deleteSubscriberVault(s *subscriberVault) {
 
-	fmt.Printf("TRIGGERED")
 	dbs.subscribersVaultMu.Lock()
 	defer dbs.subscribersVaultMu.Unlock()
 

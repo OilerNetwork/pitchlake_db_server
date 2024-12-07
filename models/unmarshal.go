@@ -78,7 +78,7 @@ func (b *Bid) UnmarshalJSON(data []byte) error {
 	// Auxiliary struct to map JSON keys
 	aux := struct {
 		BuyerAddress string `json:"address"`
-		RoundAddress BigInt `json:"round_address"`
+		RoundAddress string `json:"round_address"`
 		BidID        string `json:"bid_id"`
 		TreeNonce    string `json:"tree_nonce"`
 		Amount       BigInt `json:"amount"`

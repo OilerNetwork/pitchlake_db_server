@@ -68,7 +68,7 @@ type subscriberVaultRequest struct {
 type webSocketPayload struct {
 	PayloadType            string                        `json:"payloadType"`
 	LiquidityProviderState models.LiquidityProviderState `json:"liquidityProviderState"`
-	OptionBuyerStates      []*models.OptionBuyer         `json:"optionBuyerState"`
+	OptionBuyerStates      []*models.OptionBuyer         `json:"optionBuyerStates"`
 	VaultState             models.VaultState             `json:"vaultState"`
 	OptionRoundStates      []*models.OptionRound         `json:"optionRoundStates"`
 }

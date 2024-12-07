@@ -80,7 +80,7 @@ type LiquidityProviderState struct {
 
 type Bid struct {
 	BuyerAddress string `json:"address"`
-	RoundAddress BigInt `json:"roundAddress"`
+	RoundAddress string `json:"roundAddress"`
 	BidID        string `json:"bidId"`
 	TreeNonce    string `json:"treeNonce"`
 	Amount       BigInt `json:"amount"`

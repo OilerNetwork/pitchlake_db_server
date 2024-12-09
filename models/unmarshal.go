@@ -137,9 +137,9 @@ func (or *OptionRound) UnmarshalJSON(data []byte) error {
 		Address            string `json:"address"`
 		RoundID            BigInt `json:"round_id"`
 		CapLevel           BigInt `json:"cap_level"`
-		AuctionStartDate   string `json:"auction_start_date"`
-		AuctionEndDate     string `json:"auction_end_date"`
-		OptionSettleDate   string `json:"option_settle_date"`
+		AuctionStartDate   string `json:"start_date"`
+		AuctionEndDate     string `json:"end_date"`
+		OptionSettleDate   string `json:"settle_date"`
 		StartingLiquidity  BigInt `json:"starting_liquidity"`
 		QueuedLiquidity    BigInt `json:"queued_liquidity"`
 		RemainingLiquidity BigInt `json:"remaining_liquidity"`
@@ -150,7 +150,7 @@ func (or *OptionRound) UnmarshalJSON(data []byte) error {
 		StrikePrice        BigInt `json:"strike_price"`
 		OptionsSold        BigInt `json:"options_sold"`
 		UnsoldLiquidity    BigInt `json:"unsold_liquidity"`
-		RoundState         string `json:"round_state"`
+		RoundState         string `json:"state"`
 		Premiums           BigInt `json:"premiums"`
 		PayoutPerOption    BigInt `json:"payout_per_option"`
 		DeploymentDate     uint64 `json:"deployment_date"`

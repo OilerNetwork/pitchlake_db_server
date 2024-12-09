@@ -28,6 +28,10 @@ func (dbs *dbServer) listener() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	_, err = dbs.db.Conn.Exec(context.Background(), "LISTEN bids_update")
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	fmt.Println("Waiting for notifications...")
 
@@ -41,6 +45,30 @@ func (dbs *dbServer) listener() {
 		//Process notification here
 		switch notification.Channel {
 
+		case "bids_channel":
+			var updatedData webSocketPayload
+			var bidData BidData
+			err := json.Unmarshal([]byte(notification.Payload), &bidData)
+			if err != nil {
+				log.Printf("Error parsing ob_update payload: %v", err)
+				return
+			}
+			updatedData.PayloadType = "bid_update"
+			updatedData.BidData = bidData
+			response, err := json.Marshal(updatedData)
+
+			if err != nil {
+				log.Printf("Error parsing ob_update payload: %v", err)
+				return
+			}
+			for _, vaults := range dbs.subscribersVault {
+				for _, s := range vaults {
+					if s.address == bidData.Bid.BuyerAddress {
+						s.msgs <- []byte(response)
+					}
+				}
+
+			}
 		case "lp_update":
 			var updatedData webSocketPayload
 			var updatedRow models.LiquidityProviderState

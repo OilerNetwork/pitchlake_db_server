@@ -31,9 +31,9 @@ type OptionRound struct {
 	Address            string `json:"address"`
 	RoundID            BigInt `json:"roundId"`
 	CapLevel           BigInt `json:"capLevel"`
-	AuctionStartDate   string `json:"auctionStartDate"`
-	AuctionEndDate     string `json:"auctionEndDate"`
-	OptionSettleDate   string `json:"optionSettleDate"`
+	AuctionStartDate   uint64 `json:"auctionStartDate"`
+	AuctionEndDate     uint64 `json:"auctionEndDate"`
+	OptionSettleDate   uint64 `json:"optionSettleDate"`
 	StartingLiquidity  BigInt `json:"startingLiquidity"`
 	QueuedLiquidity    BigInt `json:"queuedLiquidity"`
 	RemainingLiquidity BigInt `json:"remainingLiquidity"`

@@ -137,9 +137,9 @@ func (or *OptionRound) UnmarshalJSON(data []byte) error {
 		Address            string `json:"address"`
 		RoundID            BigInt `json:"round_id"`
 		CapLevel           BigInt `json:"cap_level"`
-		AuctionStartDate   string `json:"start_date"`
-		AuctionEndDate     string `json:"end_date"`
-		OptionSettleDate   string `json:"settle_date"`
+		AuctionStartDate   uint64 `json:"start_date"`
+		AuctionEndDate     uint64 `json:"end_date"`
+		OptionSettleDate   uint64 `json:"settle_date"`
 		StartingLiquidity  BigInt `json:"starting_liquidity"`
 		QueuedLiquidity    BigInt `json:"queued_liquidity"`
 		RemainingLiquidity BigInt `json:"remaining_liquidity"`

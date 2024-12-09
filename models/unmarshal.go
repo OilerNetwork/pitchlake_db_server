@@ -44,8 +44,8 @@ func (vs *VaultState) UnmarshalJSON(data []byte) error {
 		OptionRoundClassHash  string `json:"option_round_class_hash"`
 		Alpha                 BigInt `json:"alpha"`
 		StrikeLevel           BigInt `json:"strike_level"`
-		AuctionRunTime        uint64 `json:"auction_run_time"`
-		OptionRunTime         uint64 `json:"option_run_time"`
+		AuctionRunTime        uint64 `json:"auction_duration"`
+		OptionRunTime         uint64 `json:"round_duration"`
 		RoundTransitionPeriod uint64 `json:"round_transition_period"`
 	}{}
 
@@ -148,7 +148,7 @@ func (or *OptionRound) UnmarshalJSON(data []byte) error {
 		SettlementPrice    BigInt `json:"settlement_price"`
 		ReservePrice       BigInt `json:"reserve_price"`
 		StrikePrice        BigInt `json:"strike_price"`
-		OptionsSold        BigInt `json:"options_sold"`
+		OptionsSold        BigInt `json:"sold_options"`
 		UnsoldLiquidity    BigInt `json:"unsold_liquidity"`
 		RoundState         string `json:"state"`
 		Premiums           BigInt `json:"premiums"`

@@ -7,7 +7,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 
@@ -20,9 +19,9 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 	var closed bool
 	//Extract address from the request and add here
 
-	allowedOrigin := os.Getenv("APP_URL")
+	//allowedOrigin := os.Getenv("APP_URL")
 	c2, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		OriginPatterns: []string{allowedOrigin},
+		//	OriginPatterns: []string{allowedOrigin},
 	})
 	if err != nil {
 		return err
@@ -169,10 +168,10 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 	var c *websocket.Conn
 	var closed bool
 
-	allowedOrigin := os.Getenv("APP_URL")
+	//allowedOrigin := os.Getenv("APP_URL")
 	// Accept the WebSocket connection
 	c2, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		OriginPatterns: []string{allowedOrigin},
+		//	OriginPatterns: []string{allowedOrigin},
 	})
 	if err != nil {
 		return err

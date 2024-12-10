@@ -20,9 +20,7 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 	//Extract address from the request and add here
 
 	//allowedOrigin := os.Getenv("APP_URL")
-	c2, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		//	OriginPatterns: []string{allowedOrigin},
-	})
+	c2, err := websocket.Accept(w, r, nil)
 	if err != nil {
 		return err
 	}
@@ -170,9 +168,7 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 
 	//allowedOrigin := os.Getenv("APP_URL")
 	// Accept the WebSocket connection
-	c2, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		//	OriginPatterns: []string{allowedOrigin},
-	})
+	c2, err := websocket.Accept(w, r, nil)
 	if err != nil {
 		return err
 	}

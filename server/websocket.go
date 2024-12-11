@@ -68,7 +68,7 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 	defer c.CloseNow()
 
 	//Send initial payload here
-	var payload webSocketPayload
+	var payload InitialPayload
 
 	payload.PayloadType = "initial"
 	vaultState, err := dbs.db.GetVaultStateByID(s.vaultAddress)
@@ -122,7 +122,7 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 				log.Printf("Incorrect message format: %v", err)
 				break
 			}
-			var payload webSocketPayload
+			var payload InitialPayload
 			if request.UpdatedField == "address" {
 				s.address = request.UpdatedValue
 

@@ -1,5 +1,8 @@
 package models
 
+type AllowedPayload interface {
+	IsAllowedPayload() // Dummy method
+}
 type Vault struct {
 	BlockNumber     BigInt `json:"blockNumber"`
 	UnlockedBalance BigInt `json:"unlockedBalance"`
@@ -86,3 +89,9 @@ type Bid struct {
 	Amount       BigInt `json:"amount"`
 	Price        BigInt `json:"price"`
 }
+
+func (Bid) IsAllowedPayload()                    {}
+func (VaultState) IsAllowedPayload()             {}
+func (LiquidityProviderState) IsAllowedPayload() {}
+func (OptionRound) IsAllowedPayload()            {}
+func (OptionBuyer) IsAllowedPayload()            {}

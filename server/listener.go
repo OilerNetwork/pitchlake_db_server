@@ -41,20 +41,17 @@ func (dbs *dbServer) listener() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("PAYLOAD %v", notification.Payload)
 		//Process notification here
 		switch notification.Channel {
 
-		case "bids_channel":
-			var updatedData webSocketPayload
-			var bidData BidData
-			err := json.Unmarshal([]byte(notification.Payload), &bidData)
+		case "bids_update":
+			var updatedData NotificationPayload[models.Bid]
+			err := json.Unmarshal([]byte(notification.Payload), &updatedData)
 			if err != nil {
 				log.Printf("Error parsing ob_update payload: %v", err)
 				return
 			}
-			updatedData.PayloadType = "bid_update"
-			updatedData.BidData = bidData
+			updatedData.Type = "bid"
 			response, err := json.Marshal(updatedData)
 
 			if err != nil {
@@ -63,63 +60,57 @@ func (dbs *dbServer) listener() {
 			}
 			for _, vaults := range dbs.subscribersVault {
 				for _, s := range vaults {
-					if s.address == bidData.Bid.BuyerAddress {
+					if s.address == updatedData.Payload.BuyerAddress {
 						s.msgs <- []byte(response)
 					}
 				}
 
 			}
 		case "lp_update":
-			var updatedData webSocketPayload
-			var updatedRow models.LiquidityProviderState
-			err := json.Unmarshal([]byte(notification.Payload), &updatedRow)
+			var updatedData NotificationPayload[models.LiquidityProviderState]
+			err := json.Unmarshal([]byte(notification.Payload), &updatedData)
 			if err != nil {
 				log.Printf("Error parsing lp_update payload: %v", err)
 				return
 			}
-			updatedData.LiquidityProviderState = updatedRow
-			updatedData.PayloadType = "lp_update"
+			updatedData.Type = "lpState"
 			response, err := json.Marshal(updatedData)
 			if err != nil {
 				log.Printf("Error parsing lp_update payload: %v", err)
 				return
 			}
-			for _, lp := range dbs.subscribersVault[updatedRow.VaultAddress] {
-				if lp.address == updatedRow.Address {
+			for _, lp := range dbs.subscribersVault[updatedData.Payload.VaultAddress] {
+				if lp.address == updatedData.Payload.Address {
 					lp.msgs <- []byte(response)
 				}
 			}
 			fmt.Printf("Received an update on lp_row_update, %s", notification.Payload)
 		case "vault_update":
-			var updatedData webSocketPayload
-			var updatedRow models.VaultState
-			err := json.Unmarshal([]byte(notification.Payload), &updatedRow)
-			updatedData.VaultState = updatedRow
+			var updatedData NotificationPayload[models.VaultState]
+			err := json.Unmarshal([]byte(notification.Payload), &updatedData)
 			if err != nil {
 				log.Printf("Error parsing vault_update payload: %v", err)
 				return
 			}
-			fmt.Printf("REACHED %v ", updatedRow.Address)
-			updatedData.PayloadType = "vault_update"
+			updatedData.Type = "vaultState"
 			response, err := json.Marshal(updatedData)
 			if err != nil {
 				log.Printf("Marshalling error %v", err)
 				return
 			}
-			for _, s := range dbs.subscribersVault[updatedRow.Address] {
+			for _, s := range dbs.subscribersVault[updatedData.Payload.Address] {
 				s.msgs <- []byte(response)
 			}
 			fmt.Println("Received an update on vault_update")
 		case "ob_update":
-			var updatedData webSocketPayload
+			var updatedData NotificationPayload[models.OptionBuyer]
 			var newOptionBuyer models.OptionBuyer
-			err := json.Unmarshal([]byte(notification.Payload), &newOptionBuyer)
+			err := json.Unmarshal([]byte(notification.Payload), &updatedData)
 			if err != nil {
 				log.Printf("Error parsing ob_update payload: %v", err)
 				return
 			}
-			updatedData.PayloadType = "ob_update"
-			updatedData.OptionBuyerStates = append(updatedData.OptionBuyerStates, &newOptionBuyer)
+			updatedData.Type = "optionBuyerState"
 			response, err := json.Marshal(updatedData)
 
 			if err != nil {
@@ -137,25 +128,23 @@ func (dbs *dbServer) listener() {
 		case "or_update":
 			fmt.Println("Received an update on or_update")
 			// Parse the JSON payload
-			var updatedData webSocketPayload
-			var updatedRow models.OptionRound
-			err := json.Unmarshal([]byte(notification.Payload), &updatedRow)
+			var updatedData NotificationPayload[models.OptionRound]
+			err := json.Unmarshal([]byte(notification.Payload), &updatedData)
 			if err != nil {
 				log.Printf("Error parsing or_update payload: %v", err)
 				return
 			}
-			updatedData.PayloadType = "or_update"
-			updatedData.OptionRoundStates = append(updatedData.OptionRoundStates, &updatedRow)
+			updatedData.Type = "optionRoundState"
 			response, err := json.Marshal(updatedData)
 			if err != nil {
 				log.Printf("Error parsing or_update payload: %v", err)
 				return
 			}
 			// Print the updated row
-			fmt.Printf("Updated OptionRound: %+v\n", updatedRow)
-			if dbs.subscribersVault[updatedRow.VaultAddress] != nil {
+			fmt.Printf("Updated OptionRound: %+v\n", updatedData.Payload.Address)
+			if dbs.subscribersVault[updatedData.Payload.VaultAddress] != nil {
 
-				for _, s := range dbs.subscribersVault[updatedRow.VaultAddress] {
+				for _, s := range dbs.subscribersVault[updatedData.Payload.VaultAddress] {
 					s.msgs <- []byte(response)
 				}
 			}

@@ -70,13 +70,21 @@ type BidData struct {
 	Operation string     `json:"operation"`
 	Bid       models.Bid `json:"bid"`
 }
-type webSocketPayload struct {
+
+type AllowedPayload interface {
+	IsAllowedPayload() // Dummy method
+}
+type NotificationPayload[T AllowedPayload] struct {
+	Operation string `json:"operation"`
+	Type      string `json:"type"`
+	Payload   T      `json:"payload"`
+}
+type InitialPayload struct {
 	PayloadType            string                        `json:"payloadType"`
 	LiquidityProviderState models.LiquidityProviderState `json:"liquidityProviderState"`
 	OptionBuyerStates      []*models.OptionBuyer         `json:"optionBuyerStates"`
 	VaultState             models.VaultState             `json:"vaultState"`
 	OptionRoundStates      []*models.OptionRound         `json:"optionRoundStates"`
-	BidData                BidData                       `json:"newBid"`
 }
 
 // newdbServer constructs a dbServer with the defaults.

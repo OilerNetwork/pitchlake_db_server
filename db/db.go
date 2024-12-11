@@ -203,6 +203,11 @@ func (db *DB) GetOptionRoundByAddress(address string) (*models.OptionRound, erro
 	}
 	return &optionRound, nil
 }
+func (db *DB) GetVaultAddressByRoundId() ([]string, error) {
+
+	return nil, nil
+}
+
 func (db *DB) GetVaultAddresses() ([]string, error) {
 	var vaultAddresses []string
 

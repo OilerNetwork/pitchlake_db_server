@@ -1,4 +1,4 @@
-name: Juno Plugin CI
+name: Db Server CI
 
 on:
   push:

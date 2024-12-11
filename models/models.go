@@ -1,99 +1,8 @@
 package models
 
-import (
-	"database/sql/driver"
-	"fmt"
-	"math/big"
-	"strings"
-)
-
-type BigInt struct {
-	*big.Int
+type AllowedPayload interface {
+	IsAllowedPayload() // Dummy method
 }
-
-var (
-	maxUint256 = new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1))
-)
-
-// Scan implements the sql.Scanner interface for BigInt
-func (b *BigInt) Scan(value interface{}) error {
-	if b.Int == nil {
-		b.Int = new(big.Int)
-	}
-
-	switch v := value.(type) {
-	case []byte:
-		return b.scanString(string(v))
-	case string:
-		return b.scanString(v)
-	case int64:
-		b.Int.SetInt64(v)
-	case nil:
-		b.Int.SetInt64(0)
-	default:
-		return fmt.Errorf("unsupported Scan, storing driver.Value type %T into type BigInt", value)
-	}
-
-	return b.validateUint256()
-}
-
-func (b *BigInt) scanString(s string) error {
-	s = strings.TrimSpace(s)
-	_, ok := b.Int.SetString(s, 10) // Parse as decimal
-	if !ok {
-		return fmt.Errorf("failed to scan BigInt: invalid value %q", s)
-	}
-	return b.validateUint256()
-}
-
-func (b *BigInt) validateUint256() error {
-	if b.Int.Sign() < 0 {
-		return fmt.Errorf("negative numbers are not allowed for uint256")
-	}
-	if b.Int.Cmp(maxUint256) > 0 {
-		return fmt.Errorf("value exceeds maximum uint256")
-	}
-	return nil
-}
-
-// Value implements the driver.Valuer interface for BigInt
-func (b BigInt) Value() (driver.Value, error) {
-	if b.Int == nil {
-		return "0", nil
-	}
-	return b.Int.String(), nil // Return as decimal string
-}
-
-// UnmarshalJSON implements the json.Unmarshaler interface
-func (b *BigInt) UnmarshalJSON(data []byte) error {
-	if string(data) == "null" {
-		return nil // This allows for null values
-	}
-	var i big.Int
-	err := i.UnmarshalJSON(data)
-	if err != nil {
-		return err
-	}
-	b.Int = &i
-	return nil
-}
-
-// MarshalJSON implements the json.Marshaler interface.
-func (b *BigInt) MarshalJSON() ([]byte, error) {
-	if b == nil || b.Int == nil {
-		return []byte("null"), nil
-	}
-	return b.Int.MarshalJSON()
-}
-
-// String returns a decimal string representation of BigInt
-func (b BigInt) String() string {
-	if b.Int == nil {
-		return "0"
-	}
-	return b.Int.String()
-}
-
 type Vault struct {
 	BlockNumber     BigInt `json:"blockNumber"`
 	UnlockedBalance BigInt `json:"unlockedBalance"`
@@ -117,6 +26,7 @@ type OptionBuyer struct {
 	HasMinted         bool   `json:"hasMinted"`
 	HasRefunded       bool   `json:"hasRefunded"`
 	RefundableOptions BigInt `json:"refundableOptions"`
+	Bids              []*Bid `json:"bids"`
 }
 
 type OptionRound struct {
@@ -124,9 +34,9 @@ type OptionRound struct {
 	Address            string `json:"address"`
 	RoundID            BigInt `json:"roundId"`
 	CapLevel           BigInt `json:"capLevel"`
-	AuctionStartDate   string `json:"auctionStartDate"`
-	AuctionEndDate     string `json:"auctionEndDate"`
-	OptionSettleDate   string `json:"optionSettleDate"`
+	AuctionStartDate   uint64 `json:"auctionStartDate"`
+	AuctionEndDate     uint64 `json:"auctionEndDate"`
+	OptionSettleDate   uint64 `json:"optionSettleDate"`
 	StartingLiquidity  BigInt `json:"startingLiquidity"`
 	QueuedLiquidity    BigInt `json:"queuedLiquidity"`
 	RemainingLiquidity BigInt `json:"remainingLiquidity"`
@@ -140,6 +50,7 @@ type OptionRound struct {
 	RoundState         string `json:"roundState"`
 	Premiums           BigInt `json:"premiums"`
 	PayoutPerOption    BigInt `json:"payoutPerOption"`
+	DeploymentDate     uint64 `json:"deploymentDate"`
 }
 
 type VaultState struct {
@@ -149,10 +60,16 @@ type VaultState struct {
 	LockedBalance         BigInt `json:"lockedBalance"`
 	StashedBalance        BigInt `json:"stashedBalance"`
 	Address               string `json:"address"`
-	LatestBlock           BigInt `json:"lastBlock"`
-	AuctionRunTime        BigInt `json:"auctionRunTime"`
-	OptionRunTime         BigInt `json:"optionRunTime"`
-	RoundTransitionPeriod BigInt `json:"roundTransitionPeriod"`
+	LatestBlock           BigInt `json:"latestBlock"`
+	DeploymentDate        uint64 `json:"deploymentDate"`
+	FossilClientAddress   string `json:"fossilClientAddress"`
+	EthAddress            string `json:"ethAddress"`
+	OptionRoundClassHash  string `json:"optionRoundClassHash"`
+	Alpha                 BigInt `json:"alpha"`
+	StrikeLevel           BigInt `json:"strikeLevel"`
+	AuctionRunTime        uint64 `json:"auctionRunTime"`
+	OptionRunTime         uint64 `json:"optionRunTime"`
+	RoundTransitionPeriod uint64 `json:"roundTransitionPeriod"`
 }
 
 type LiquidityProviderState struct {
@@ -161,16 +78,20 @@ type LiquidityProviderState struct {
 	UnlockedBalance BigInt `json:"unlockedBalance"`
 	LockedBalance   BigInt `json:"lockedBalance"`
 	StashedBalance  BigInt `json:"stashedBalance"`
-	LatestBlock     BigInt `json:"lastBlock"`
+	LatestBlock     BigInt `json:"latestBlock"`
 }
 
 type Bid struct {
-	Address   string `json:"address"`
-	RoundID   BigInt `json:"roundId"`
-	BidID     string `json:"bidId"`
-	TreeNonce string `json:"treeNonce"`
-	Amount    BigInt `json:"amount"`
-	Price     BigInt `json:"price"`
+	BuyerAddress string `json:"address"`
+	RoundAddress string `json:"roundAddress"`
+	BidID        string `json:"bidId"`
+	TreeNonce    string `json:"treeNonce"`
+	Amount       BigInt `json:"amount"`
+	Price        BigInt `json:"price"`
 }
-type Position struct {
-}
+
+func (Bid) IsAllowedPayload()                    {}
+func (VaultState) IsAllowedPayload()             {}
+func (LiquidityProviderState) IsAllowedPayload() {}
+func (OptionRound) IsAllowedPayload()            {}
+func (OptionBuyer) IsAllowedPayload()            {}

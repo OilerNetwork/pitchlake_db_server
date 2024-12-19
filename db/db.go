@@ -88,7 +88,7 @@ func (db *DB) GetOptionRoundsByVaultAddress(vaultAddress string) ([]*models.Opti
 		`
 	SELECT 
     address, vault_address, round_id, cap_level, start_date, end_date, settlement_date, 
-    starting_liquidity, queued_liquidity, available_options, reserve_price, 
+    starting_liquidity, queued_liquidity,remaining_liquidity, unsold_liquiditiy, available_options, reserve_price, 
     settlement_price, strike_price, sold_options, clearing_price, state, 
     premiums, payout_per_option, deployment_date
 	FROM 
@@ -115,6 +115,8 @@ func (db *DB) GetOptionRoundsByVaultAddress(vaultAddress string) ([]*models.Opti
 			&optionRound.OptionSettleDate,
 			&optionRound.StartingLiquidity,
 			&optionRound.QueuedLiquidity,
+			&optionRound.RemainingLiquidity,
+			&optionRound.UnsoldLiquidity,
 			&optionRound.AvailableOptions,
 			&optionRound.ReservePrice,
 			&optionRound.SettlementPrice,
@@ -178,7 +180,7 @@ func (db *DB) GetAllVaultStates() ([]models.VaultState, error) {
 
 func (db *DB) GetOptionRoundByAddress(address string) (*models.OptionRound, error) {
 	var optionRound models.OptionRound
-	query := `SELECT address, round_id, bids, cap_level, starting_block, ending_block, settlement_date, starting_liquidity, queued_liquidity, available_options, settlement_price, strike_price, sold_options, clearing_price, state, premiums, payout_per_option, deployment_date FROM public."Option_Rounds" WHERE address=$1`
+	query := `SELECT address, round_id, bids, cap_level, starting_block, ending_block, settlement_date, starting_liquidity, queued_liquidity,remaining_liquidity, unsold_liquidity, available_options, settlement_price, strike_price, sold_options, clearing_price, state, premiums, payout_per_option, deployment_date FROM public."Option_Rounds" WHERE address=$1`
 	err := db.Pool.QueryRow(context.Background(), query, address).Scan(
 		&optionRound.Address,
 		&optionRound.RoundID,
@@ -188,6 +190,8 @@ func (db *DB) GetOptionRoundByAddress(address string) (*models.OptionRound, erro
 		&optionRound.OptionSettleDate,
 		&optionRound.StartingLiquidity,
 		&optionRound.QueuedLiquidity,
+		&optionRound.RemainingLiquidity,
+		&optionRound.UnsoldLiquidity,
 		&optionRound.AvailableOptions,
 		&optionRound.SettlementPrice,
 		&optionRound.StrikePrice,
@@ -203,11 +207,6 @@ func (db *DB) GetOptionRoundByAddress(address string) (*models.OptionRound, erro
 	}
 	return &optionRound, nil
 }
-func (db *DB) GetVaultAddressByRoundId() ([]string, error) {
-
-	return nil, nil
-}
-
 func (db *DB) GetVaultAddresses() ([]string, error) {
 	var vaultAddresses []string
 

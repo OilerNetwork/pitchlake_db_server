@@ -11,13 +11,12 @@ type Vault struct {
 }
 
 type LiquidityProvider struct {
-	VaultAddress    string          `json:"vaultAddress"`
-	Address         string          `json:"address"`
-	BlockNumber     BigInt          `json:"blockNumber"`
-	UnlockedBalance BigInt          `json:"unlockedBalance"`
-	LockedBalance   BigInt          `json:"lockedBalance"`
-	StashedBalance  BigInt          `json:"stashedBalance"`
-	QueuedLiquidity QueuedLiquidity `json:"queuedLiquidity"`
+	VaultAddress    string `json:"vaultAddress"`
+	Address         string `json:"address"`
+	BlockNumber     BigInt `json:"blockNumber"`
+	UnlockedBalance BigInt `json:"unlockedBalance"`
+	LockedBalance   BigInt `json:"lockedBalance"`
+	StashedBalance  BigInt `json:"stashedBalance"`
 }
 
 type OptionBuyer struct {

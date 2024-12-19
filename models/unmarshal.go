@@ -101,6 +101,28 @@ func (b *Bid) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (ql *QueuedLiquidity) UnmarshalJSON(data []byte) error {
+	// Auxiliary struct to map JSON keys
+	aux := struct {
+		Address         string `json:"address"`
+		RoundAddress    string `json:"round_address"`
+		Bps             BigInt `json:"bps"`
+		QueuedLiquidity BigInt `json:"queued_liquidity"`
+	}{}
+
+	// Unmarshal into the auxiliary struct
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	// Copy data from aux to the original struct
+	ql.Address = aux.Address
+	ql.RoundAddress = aux.RoundAddress
+	ql.Bps = aux.Bps
+	ql.QueuedLiquidity = aux.QueuedLiquidity
+
+	return nil
+}
 func (ob *OptionBuyer) UnmarshalJSON(data []byte) error {
 	// Auxiliary struct to map JSON keys
 	aux := struct {

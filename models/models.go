@@ -81,6 +81,12 @@ type LiquidityProviderState struct {
 	LatestBlock     BigInt `json:"latestBlock"`
 }
 
+type QueuedLiquidity struct {
+	Address         string `json:"address"`
+	RoundAddress    string `json:"roundAddress"`
+	Bps             BigInt `json:"bps"`
+	QueuedLiquidity BigInt `json:"queuedLiquidity"`
+}
 type Bid struct {
 	BuyerAddress string `json:"address"`
 	RoundAddress string `json:"roundAddress"`
@@ -95,3 +101,4 @@ func (VaultState) IsAllowedPayload()             {}
 func (LiquidityProviderState) IsAllowedPayload() {}
 func (OptionRound) IsAllowedPayload()            {}
 func (OptionBuyer) IsAllowedPayload()            {}
+func (QueuedLiquidity) IsAllowedPayload()        {}

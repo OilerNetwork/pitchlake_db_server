@@ -88,7 +88,7 @@ func (db *DB) GetOptionRoundsByVaultAddress(vaultAddress string) ([]*models.Opti
 		`
 	SELECT 
     address, vault_address, round_id, cap_level, start_date, end_date, settlement_date, 
-    starting_liquidity, queued_liquidity,remaining_liquidity, unsold_liquiditiy, available_options, reserve_price, 
+    starting_liquidity, queued_liquidity,remaining_liquidity, unsold_liquidity, available_options, reserve_price, 
     settlement_price, strike_price, sold_options, clearing_price, state, 
     premiums, payout_per_option, deployment_date
 	FROM 

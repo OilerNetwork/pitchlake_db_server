@@ -42,8 +42,8 @@ type dbServer struct {
 	subscribersHomeMu   sync.Mutex
 	subscribersHome     map[*subscriberHome]struct{}
 	subscribersFossilMu sync.Mutex
-	subscribersFossil   map[string]map[*subscriberFossil]struct{}
-	vaults              map[string][]*vaultStats
+	subscribersFossil   map[string]map[uint64]map[*subscriberFossil]struct{}
+	vaults              map[string]map[uint64]*FossilJob
 	ctx                 context.Context
 	cancel              context.CancelFunc
 }
@@ -65,13 +65,13 @@ type subscriberHome struct {
 }
 type subscriberFossil struct {
 	vaultAddress string
+	targetTime   uint64
 	msgs         chan []byte
 	closeSlow    func()
 }
-type vaultStats struct {
-	VaultAddress string
-	RoundAddress string
-	Status       FossilStatus
+type FossilJob struct {
+	Duration  uint64
+	JobStatus FossilStatus
 }
 
 type FossilStatusPayload struct {
@@ -80,7 +80,6 @@ type FossilStatusPayload struct {
 
 type subscriberFossilMessage struct {
 	VaultAddress  string `json:"vaultAddress"`
-	RoundAddress  string `json:"roundAddress"`
 	Duration      uint64 `json:"duration"`
 	TargetTime    uint64 `json:"targetTime"`
 	ClientAddress string `json:"clientAddress"`
@@ -100,6 +99,10 @@ type subscriberVaultRequest struct {
 type BidData struct {
 	Operation string     `json:"operation"`
 	Bid       models.Bid `json:"bid"`
+}
+
+type FossilPayload struct {
+	Status FossilStatus `json:"status"`
 }
 
 type AllowedPayload interface {

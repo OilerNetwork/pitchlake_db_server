@@ -42,6 +42,7 @@ func (dbs *dbServer) subscribeFossil(ctx context.Context, w http.ResponseWriter,
 	}
 	s := &subscriberFossil{
 		vaultAddress: sm.VaultAddress,
+		targetTime:   sm.TargetTime,
 		msgs:         make(chan []byte, dbs.subscriberMessageBuffer),
 		closeSlow: func() {
 			// mu.Lock()
@@ -61,14 +62,55 @@ func (dbs *dbServer) subscribeFossil(ctx context.Context, w http.ResponseWriter,
 	mu.Unlock()
 	defer c.CloseNow()
 
-	fossilStatus, err := fossil.GetFossilStatus(sm.TargetTime, sm.Duration)
-	//Send Fossil Request
-	fossilData, err := fossil.MakeFossilRequest(sm.TargetTime, sm.Duration, sm.VaultAddress, sm.VaultAddress)
+	payload := FossilPayload{}
+	//Check if the vault has a fossil status, if not, send a fossil request
+	stats, exists := dbs.vaults[sm.VaultAddress][sm.TargetTime]
+	if !exists {
 
+		fossilStatus, err := fossil.GetFossilStatus(sm.TargetTime, sm.Duration)
+		//Send Fossil Request
+		if err != nil {
+			//Check if the error is request not found, create a new fossil job
+			if fossilStatus.Status == "request not found" {
+				//Make a new fossil request, need to make the request so the timestamp is verified before adding to the map
+				fossilData, err := fossil.MakeFossilRequest(sm.TargetTime, sm.Duration, sm.VaultAddress, sm.VaultAddress)
+				if err != nil {
+					return err
+				}
+				status := FossilStatus(fossilData.Status)
+				dbs.vaults[sm.VaultAddress][sm.TargetTime] = &FossilJob{
+					Duration:  sm.Duration,
+					JobStatus: status,
+				}
+				//Start a goroutine to monitor the fossil job status
+				go dbs.monitorFossilJobStatus(sm.VaultAddress, sm.TargetTime, sm.Duration)
+				payload.Status = status
+			}
+			return err
+		}
+		dbs.vaults[sm.VaultAddress][sm.TargetTime] = &FossilJob{
+			Duration:  sm.Duration,
+			JobStatus: FossilStatus(fossilStatus.Status),
+		}
+		//Start a goroutine to monitor the fossil job status if the status is not completed
+		if FossilStatus(fossilStatus.Status) != FossilStatusCompleted {
+			go dbs.monitorFossilJobStatus(sm.VaultAddress, sm.TargetTime, sm.Duration)
+		}
+		payload.Status = FossilStatus(fossilStatus.Status)
+
+	} else {
+		if stats.Duration != sm.Duration {
+			return fmt.Errorf("round duration mismatch")
+		}
+		payload.Status = stats.JobStatus
+
+	}
+
+	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
-	dbs.writeTimeout(ctx, time.Second*5, c, []byte{})
+	dbs.writeTimeout(ctx, time.Second*5, c, jsonPayload)
 	for {
 		select {
 		case msg := <-s.msgs:

@@ -5,12 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"pitchlake-backend/fossil"
 	"pitchlake-backend/models"
 )
-
-func (dbs *dbServer) fossilListener() {
-
-}
 
 // listener listens for notifications from the database and sends them to the appropriate subscribers
 func (dbs *dbServer) dbListener() {
@@ -153,6 +150,28 @@ func (dbs *dbServer) dbListener() {
 					s.msgs <- []byte(response)
 				}
 			}
+		}
+	}
+}
+
+func (dbs *dbServer) monitorFossilJobStatus(vaultAddress string, targetTime uint64, duration uint64) {
+	for {
+		fossilStatus, err := fossil.GetFossilStatus(targetTime, duration)
+		if err != nil {
+			return
+		}
+		if FossilStatus(fossilStatus.Status) == FossilStatusCompleted {
+			dbs.vaults[vaultAddress][targetTime].JobStatus = FossilStatus(fossilStatus.Status)
+			var payload FossilPayload
+			payload.Status = FossilStatus(fossilStatus.Status)
+			jsonPayload, err := json.Marshal(payload)
+			if err != nil {
+				return
+			}
+			for subscriber := range dbs.subscribersFossil[vaultAddress][targetTime] {
+				subscriber.msgs <- []byte(jsonPayload)
+			}
+			return
 		}
 	}
 }

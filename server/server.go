@@ -21,8 +21,8 @@ func NewDBServer(ctx context.Context) *dbServer {
 		logf:                    log.Printf,
 		subscribersVault:        make(map[string][]*subscriberVault),
 		subscribersHome:         make(map[*subscriberHome]struct{}),
-		subscribersFossil:       make(map[string]map[*subscriberFossil]struct{}),
-		vaults:                  make(map[string][]*vaultStats),
+		subscribersFossil:       make(map[string]map[uint64]map[*subscriberFossil]struct{}),
+		vaults:                  make(map[string]map[uint64]*FossilJob),
 		db:                      db,
 		ctx:                     ctx,
 		cancel:                  cancel,
@@ -33,7 +33,6 @@ func NewDBServer(ctx context.Context) *dbServer {
 	dbs.serveMux.HandleFunc("/health", dbs.healthCheckHandler)
 	dbs.serveMux.HandleFunc("/subscribeFossil", dbs.subscribeFossilHandler)
 	go dbs.dbListener()
-	go dbs.fossilListener()
 	return dbs
 }
 
@@ -67,18 +66,19 @@ func (dbs *dbServer) addSubscriberFossil(s *subscriberFossil) {
 	defer dbs.subscribersFossilMu.Unlock()
 
 	// Initialize the slice if it doesn't exist
-	if _, exists := dbs.subscribersFossil[s.vaultAddress]; !exists {
-		dbs.subscribersFossil[s.vaultAddress] = make(map[*subscriberFossil]struct{})
+
+	if _, exists := dbs.subscribersFossil[s.vaultAddress][s.targetTime]; !exists {
+		dbs.subscribersFossil[s.vaultAddress][s.targetTime] = make(map[*subscriberFossil]struct{})
 	}
 
-	dbs.subscribersFossil[s.vaultAddress][s] = struct{}{}
+	dbs.subscribersFossil[s.vaultAddress][s.targetTime][s] = struct{}{}
 
 }
 
 func (dbs *dbServer) deleteSubscriberFossil(s *subscriberFossil) {
 
 	dbs.subscribersFossilMu.Lock()
-	delete(dbs.subscribersFossil[s.vaultAddress], s)
+	delete(dbs.subscribersFossil[s.vaultAddress][s.targetTime], s)
 	dbs.subscribersFossilMu.Unlock()
 }
 

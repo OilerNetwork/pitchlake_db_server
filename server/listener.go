@@ -8,7 +8,12 @@ import (
 	"pitchlake-backend/models"
 )
 
-func (dbs *dbServer) listener() {
+func (dbs *dbServer) fossilListener() {
+
+}
+
+// listener listens for notifications from the database and sends them to the appropriate subscribers
+func (dbs *dbServer) dbListener() {
 	_, err := dbs.db.Conn.Exec(context.Background(), "LISTEN lp_update")
 	if err != nil {
 		log.Fatal(err)

@@ -119,7 +119,8 @@ func (ql *QueuedLiquidity) UnmarshalJSON(data []byte) error {
 	ql.Address = aux.Address
 	ql.RoundAddress = aux.RoundAddress
 	ql.Bps = aux.Bps
-	ql.QueuedLiquidity = aux.QueuedLiquidity
+	
+	
 
 	return nil
 }

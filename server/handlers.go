@@ -45,3 +45,18 @@ func (dbs *dbServer) healthCheckHandler(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))
 }
+
+func (dbs *dbServer) subscribeFossilHandler(w http.ResponseWriter, r *http.Request) {
+	err := dbs.subscribeFossil(r.Context(), w, r)
+	if errors.Is(err, context.Canceled) {
+		return
+	}
+	if websocket.CloseStatus(err) == websocket.StatusNormalClosure ||
+		websocket.CloseStatus(err) == websocket.StatusGoingAway {
+		return
+	}
+	if err != nil {
+		dbs.logf("%v", err)
+		return
+	}
+}

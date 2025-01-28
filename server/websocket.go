@@ -10,8 +10,78 @@ import (
 	"sync"
 	"time"
 
+	"pitchlake-backend/fossil"
+
 	"github.com/coder/websocket"
 )
+
+func (dbs *dbServer) subscribeFossil(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+	var mu sync.Mutex
+	var c *websocket.Conn
+	var closed bool
+
+	//allowedOrigin := os.Getenv("APP_URL")
+	c2, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		InsecureSkipVerify: true,
+	})
+	if err != nil {
+		return err
+	}
+	defer c2.Close(websocket.StatusInternalError, "Internal server error")
+
+	// Read the first message to get the subscription data
+	_, msg, err := c2.Read(ctx)
+	if err != nil {
+		return err
+	}
+
+	var sm subscriberFossilMessage
+	err = json.Unmarshal(msg, &sm)
+	if err != nil {
+		return err
+	}
+	s := &subscriberFossil{
+		vaultAddress: sm.VaultAddress,
+		msgs:         make(chan []byte, dbs.subscriberMessageBuffer),
+		closeSlow: func() {
+			// mu.Lock()
+			// defer mu.Unlock()
+			// closed = true
+		},
+	}
+	dbs.addSubscriberFossil(s)
+	defer dbs.deleteSubscriberFossil(s)
+
+	mu.Lock()
+	if closed {
+		mu.Unlock()
+		return net.ErrClosed
+	}
+	c = c2
+	mu.Unlock()
+	defer c.CloseNow()
+
+	fossilStatus, err := fossil.GetFossilStatus(sm.TargetTime, sm.Duration)
+	//Send Fossil Request
+	fossilData, err := fossil.MakeFossilRequest(sm.TargetTime, sm.Duration, sm.VaultAddress, sm.VaultAddress)
+
+	if err != nil {
+		return err
+	}
+	dbs.writeTimeout(ctx, time.Second*5, c, []byte{})
+	for {
+		select {
+		case msg := <-s.msgs:
+			//Loop to listen for messages from the client
+			err := dbs.writeTimeout(ctx, time.Second*5, c, msg)
+			if err != nil {
+				return err
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
 
 func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
 	var mu sync.Mutex
@@ -47,12 +117,12 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 		userType:     sm.UserType,
 		msgs:         make(chan []byte, dbs.subscriberMessageBuffer),
 		closeSlow: func() {
-			mu.Lock()
-			defer mu.Unlock()
-			closed = true
-			if c != nil {
-				c.Close(websocket.StatusPolicyViolation, "connection too slow to keep up with messages")
-			}
+			// mu.Lock()
+			// defer mu.Unlock()
+			// closed = true
+			// if c != nil {
+			// 	c.Close(websocket.StatusPolicyViolation, "connection too slow to keep up with messages")
+			// }
 		},
 	}
 	dbs.addSubscriberVault(s)
@@ -183,12 +253,12 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 	s := &subscriberHome{
 		msgs: make(chan []byte, dbs.subscriberMessageBuffer),
 		closeSlow: func() {
-			mu.Lock()
-			defer mu.Unlock()
-			closed = true
-			if c != nil {
-				c.Close(websocket.StatusPolicyViolation, "connection too slow to keep up with messages")
-			}
+			// mu.Lock()
+			// defer mu.Unlock()
+			// closed = true
+			// if c != nil {
+			// 	c.Close(websocket.StatusPolicyViolation, "connection too slow to keep up with messages")
+			// }
 		},
 	}
 
@@ -228,7 +298,7 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 	for {
 		select {
 		case msg := <-s.msgs:
-			//Loop to write update messages to client
+			//Loop to listen for messages from the client
 			err := dbs.writeTimeout(ctx, time.Second*5, c, msg)
 			if err != nil {
 				return err

@@ -5,87 +5,9 @@ import (
 	"log"
 	"net/http"
 	"pitchlake-backend/db"
-	"pitchlake-backend/models"
-	"sync"
 )
 
-// dbServer enables broadcasting to a set of subscribers.
-type dbServer struct {
-	// subscriberMessageBuffer controls the max number
-	// of messages that can be queued for a subscriber
-	// before it is kicked.
-	//
-	// Defaults to 16.
-	subscriberMessageBuffer int
-	db                      *db.DB
-
-	// publishLimiter controls the rate limit applied to the publish endpoint.
-	//
-	// Defaults to one publish every 100ms with a burst of 8.
-
-	// logf controls where logs are sent.
-	// Defaults to log.Printf.
-	logf func(f string, v ...interface{})
-
-	// serveMux routes the various endpoints to the appropriate handler.
-	serveMux http.ServeMux
-
-	subscribersVaultMu sync.Mutex
-	subscribersVault   map[string][]*subscriberVault
-	subscribersHomeMu  sync.Mutex
-	subscribersHome    map[*subscriberHome]struct{}
-	ctx                context.Context
-	cancel             context.CancelFunc
-}
-
-// subscriber represents a subscriber.
-// Messages are sent on the msgs channel and if the client
-// cannot keep up with the messages, closeSlow is called.
-type subscriberVault struct {
-	msgs         chan []byte
-	address      string
-	userType     string
-	vaultAddress string
-	closeSlow    func()
-}
-
-type subscriberHome struct {
-	msgs      chan []byte
-	closeSlow func()
-}
-
-type subscriberMessage struct {
-	Address      string `json:"address"`
-	VaultAddress string `json:"vaultAddress"`
-	UserType     string `json:"userType"`
-	OptionRound  uint64 `json:"optionRound"`
-}
-
-type subscriberVaultRequest struct {
-	UpdatedField string `json:"updatedField"`
-	UpdatedValue string `json:"updatedValue"`
-}
-
-type BidData struct {
-	Operation string     `json:"operation"`
-	Bid       models.Bid `json:"bid"`
-}
-
-type AllowedPayload interface {
-	IsAllowedPayload() // Dummy method
-}
-type NotificationPayload[T AllowedPayload] struct {
-	Operation string `json:"operation"`
-	Type      string `json:"type"`
-	Payload   T      `json:"payload"`
-}
-type InitialPayload struct {
-	PayloadType            string                        `json:"payloadType"`
-	LiquidityProviderState models.LiquidityProviderState `json:"liquidityProviderState"`
-	OptionBuyerStates      []*models.OptionBuyer         `json:"optionBuyerStates"`
-	VaultState             models.VaultState             `json:"vaultState"`
-	OptionRoundStates      []*models.OptionRound         `json:"optionRoundStates"`
-}
+// FossilStatus represents the status of a fossil
 
 // newdbServer constructs a dbServer with the defaults.
 // Create a custom context for the server here and pass it to the db package
@@ -99,6 +21,8 @@ func NewDBServer(ctx context.Context) *dbServer {
 		logf:                    log.Printf,
 		subscribersVault:        make(map[string][]*subscriberVault),
 		subscribersHome:         make(map[*subscriberHome]struct{}),
+		subscribersFossil:       make(map[string]map[uint64]map[*subscriberFossil]struct{}),
+		vaults:                  make(map[string]map[uint64]*FossilJob),
 		db:                      db,
 		ctx:                     ctx,
 		cancel:                  cancel,
@@ -107,7 +31,8 @@ func NewDBServer(ctx context.Context) *dbServer {
 	dbs.serveMux.HandleFunc("/subscribeHome", dbs.subscribeHomeHandler)
 	dbs.serveMux.HandleFunc("/subscribeVault", dbs.subscribeVaultHandler)
 	dbs.serveMux.HandleFunc("/health", dbs.healthCheckHandler)
-	go dbs.listener()
+	dbs.serveMux.HandleFunc("/subscribeFossil", dbs.subscribeFossilHandler)
+	go dbs.dbListener()
 	return dbs
 }
 
@@ -134,6 +59,27 @@ func (dbs *dbServer) addSubscriberHome(s *subscriberHome) {
 	dbs.subscribersHomeMu.Lock()
 	dbs.subscribersHome[s] = struct{}{}
 	dbs.subscribersHomeMu.Unlock()
+}
+
+func (dbs *dbServer) addSubscriberFossil(s *subscriberFossil) {
+	dbs.subscribersFossilMu.Lock()
+	defer dbs.subscribersFossilMu.Unlock()
+
+	// Initialize the slice if it doesn't exist
+
+	if _, exists := dbs.subscribersFossil[s.vaultAddress][s.targetTime]; !exists {
+		dbs.subscribersFossil[s.vaultAddress][s.targetTime] = make(map[*subscriberFossil]struct{})
+	}
+
+	dbs.subscribersFossil[s.vaultAddress][s.targetTime][s] = struct{}{}
+
+}
+
+func (dbs *dbServer) deleteSubscriberFossil(s *subscriberFossil) {
+
+	dbs.subscribersFossilMu.Lock()
+	delete(dbs.subscribersFossil[s.vaultAddress][s.targetTime], s)
+	dbs.subscribersFossilMu.Unlock()
 }
 
 func (dbs *dbServer) deleteSubscriberHome(s *subscriberHome) {

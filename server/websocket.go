@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"pitchlake-backend/models"
+
 	"github.com/coder/websocket"
 )
 
@@ -237,6 +239,123 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 			return ctx.Err()
 		}
 	}
+}
+
+func (dbs *dbServer) subscribeGasData(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+	var mu sync.Mutex
+	var c *websocket.Conn
+	var closed bool
+
+	//allowedOrigin := os.Getenv("APP_URL")
+	// Accept the WebSocket connection
+	c2, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		InsecureSkipVerify: true,
+	})
+	if err != nil {
+		return err
+	}
+	defer c2.Close(websocket.StatusInternalError, "Internal server error")
+
+	// Read the first message to get the subscription data
+	_, msg, err := c2.Read(ctx)
+	if err != nil {
+		return err
+	}
+
+	s := &subscriberGas{
+		msgs: make(chan []byte, dbs.subscriberMessageBuffer),
+		closeSlow: func() {
+			mu.Lock()
+			defer mu.Unlock()
+			closed = true
+			if c != nil {
+				c.Close(websocket.StatusPolicyViolation, "connection too slow to keep up with messages")
+			}
+		},
+	}
+
+	dbs.addSubscriberGas(s)
+	defer dbs.deleteSubscriberGas(s)
+
+	mu.Lock()
+	if closed {
+		mu.Unlock()
+		return net.ErrClosed
+	}
+	c = c2
+	mu.Unlock()
+	defer c.CloseNow()
+
+	var sm subscriberGasMessage
+	err = json.Unmarshal(msg, &sm)
+	if err != nil {
+		return err
+	}
+	log.Printf("Received message from client: %v", sm)
+
+	blocks, err := dbs.db.GetBlocks(sm.StartBlock, sm.EndBlock)
+	if err != nil {
+		return err
+	}
+	log.Printf("Blocks: %v", blocks)
+
+	response := struct {
+		Blocks []models.Block `json:"blocks"`
+	}{
+		Blocks: blocks,
+	}
+	jsonPayload, err := json.Marshal(response)
+	if err != nil {
+		return err
+	}
+
+	dbs.writeTimeout(ctx, time.Second*5, c, jsonPayload)
+
+	go func() {
+		for {
+			var request subscriberGasRequest
+			_, msg, err := c.Read(ctx)
+			if err != nil {
+				log.Printf("Error reading message: %v", err)
+				break
+			}
+			log.Printf("Received message from client: %s", msg)
+			err = json.Unmarshal(msg, &request)
+			if err != nil {
+				log.Printf("Incorrect message format: %v", err)
+				break
+			}
+			blocks, err := dbs.db.GetBlocks(request.StartBlock, request.EndBlock)
+			if err != nil {
+				log.Printf("Error fetching blocks: %v", err)
+				break
+			}
+			response := struct {
+				Blocks []models.Block `json:"blocks"`
+			}{
+				Blocks: blocks,
+			}
+			jsonPayload, err := json.Marshal(response)
+			if err != nil {
+				log.Printf("Incorrect response generated: %v", err)
+			}
+			s.msgs <- []byte(jsonPayload)
+			log.Printf("Client Info %v", s)
+			// Handle the received message here
+		}
+	}()
+	for {
+		select {
+		case msg := <-s.msgs:
+			err := dbs.writeTimeout(ctx, time.Second*5, c, msg)
+			if err != nil {
+				return err
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
 }
 
 func (dbs *dbServer) writeTimeout(ctx context.Context, timeout time.Duration, c *websocket.Conn, msg []byte) error {

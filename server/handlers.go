@@ -41,6 +41,21 @@ func (dbs *dbServer) subscribeVaultHandler(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+func (dbs *dbServer) subscribeGasDataHandler(w http.ResponseWriter, r *http.Request) {
+	err := dbs.subscribeGasData(r.Context(), w, r)
+	if errors.Is(err, context.Canceled) {
+		return
+	}
+	if websocket.CloseStatus(err) == websocket.StatusNormalClosure ||
+		websocket.CloseStatus(err) == websocket.StatusGoingAway {
+		return
+	}
+	if err != nil {
+		dbs.logf("%v", err)
+		return
+	}
+}
+
 func (dbs *dbServer) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))

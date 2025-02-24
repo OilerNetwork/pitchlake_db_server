@@ -141,6 +141,38 @@ func (db *DB) GetOptionRoundsByVaultAddress(vaultAddress string) ([]*models.Opti
 
 	return optionRounds, nil
 }
+func (db *DB) GetBlocks(startBlock, endBlock uint64) ([]models.Block, error) {
+	query := `SELECT block_number, timestamp, base_fee, is_confirmed, twelve_min_twap, three_hour_twap, thirty_day_twap FROM public."Blocks" WHERE block_number BETWEEN $1 AND $2`
+	rows, err := db.Pool.Query(context.Background(), query, startBlock, endBlock)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var blocks []models.Block
+	for rows.Next() {
+		var block models.Block
+		err := rows.Scan(
+			&block.BlockNumber,
+			&block.Timestamp,
+			&block.BaseFee,
+			&block.IsConfirmed,
+			&block.TwelveMinTwap,
+			&block.ThreeHourTwap,
+			&block.ThirtyDayTwap,
+		)
+		if err != nil {
+			return nil, err
+		}
+		blocks = append(blocks, block)
+	}
+
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	return blocks, nil
+}
 
 // GetAllVaultStates retrieves all VaultState records from the database
 func (db *DB) GetAllVaultStates() ([]models.VaultState, error) {

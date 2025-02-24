@@ -208,3 +208,61 @@ func (or *OptionRound) UnmarshalJSON(data []byte) error {
 
 	return nil
 }
+
+func (b *Block) UnmarshalJSON(data []byte) error {
+	// Auxiliary struct to map JSON keys
+	aux := struct {
+		BlockNumber   BigInt  `json:"block_number"`
+		Timestamp     BigInt  `json:"timestamp"`
+		BaseFee       BigInt  `json:"base_fee"`
+		IsConfirmed   bool    `json:"is_confirmed"`
+		TwelveMinTwap *BigInt `json:"twelve_min_twap"`
+		ThreeHourTwap *BigInt `json:"three_hour_twap"`
+		ThirtyDayTwap *BigInt `json:"thirty_day_twap"`
+	}{}
+
+	// Unmarshal into the auxiliary struct
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	// Copy data from aux to the original struct
+	b.BlockNumber = aux.BlockNumber
+	b.Timestamp = aux.Timestamp
+	b.BaseFee = aux.BaseFee
+	b.IsConfirmed = aux.IsConfirmed
+	b.TwelveMinTwap = aux.TwelveMinTwap
+	b.ThreeHourTwap = aux.ThreeHourTwap
+	b.ThirtyDayTwap = aux.ThirtyDayTwap
+
+	return nil
+}
+
+func (t *TwapState) UnmarshalJSON(data []byte) error {
+	// Auxiliary struct to map JSON keys
+	aux := struct {
+		WindowType         TwapWindowType `json:"window_type"`
+		WeightedSum        BigInt         `json:"weighted_sum"`
+		TotalSeconds       BigInt         `json:"total_seconds"`
+		IsConfirmed        bool           `json:"is_confirmed"`
+		TwapValue          BigInt         `json:"twap_value"`
+		LastBlockNumber    BigInt         `json:"last_block_number"`
+		LastBlockTimestamp BigInt         `json:"last_block_timestamp"`
+	}{}
+
+	// Unmarshal into the auxiliary struct
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	// Copy data from aux to the original struct
+	t.WindowType = aux.WindowType
+	t.WeightedSum = aux.WeightedSum
+	t.TotalSeconds = aux.TotalSeconds
+	t.IsConfirmed = aux.IsConfirmed
+	t.TwapValue = aux.TwapValue
+	t.LastBlockNumber = aux.LastBlockNumber
+	t.LastBlockTimestamp = aux.LastBlockTimestamp
+
+	return nil
+}

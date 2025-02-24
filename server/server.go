@@ -34,6 +34,8 @@ type dbServer struct {
 	subscribersVault   map[string][]*subscriberVault
 	subscribersHomeMu  sync.Mutex
 	subscribersHome    map[*subscriberHome]struct{}
+	subscribersGasMu   sync.Mutex
+	subscribersGas     map[*subscriberGas]struct{}
 	ctx                context.Context
 	cancel             context.CancelFunc
 }
@@ -50,6 +52,10 @@ type subscriberVault struct {
 }
 
 type subscriberHome struct {
+	msgs      chan []byte
+	closeSlow func()
+}
+type subscriberGas struct {
 	msgs      chan []byte
 	closeSlow func()
 }
@@ -107,6 +113,7 @@ func NewDBServer(ctx context.Context) *dbServer {
 	dbs.serveMux.HandleFunc("/subscribeHome", dbs.subscribeHomeHandler)
 	dbs.serveMux.HandleFunc("/subscribeVault", dbs.subscribeVaultHandler)
 	dbs.serveMux.HandleFunc("/health", dbs.healthCheckHandler)
+	dbs.serveMux.HandleFunc("/subscribeGas", dbs.subscribeGasDataHandler)
 	go dbs.listener()
 	return dbs
 }
@@ -136,11 +143,23 @@ func (dbs *dbServer) addSubscriberHome(s *subscriberHome) {
 	dbs.subscribersHomeMu.Unlock()
 }
 
+func (dbs *dbServer) addSubscriberGas(s *subscriberGas) {
+	dbs.subscribersGasMu.Lock()
+	dbs.subscribersGas[s] = struct{}{}
+	dbs.subscribersGasMu.Unlock()
+}
+
 func (dbs *dbServer) deleteSubscriberHome(s *subscriberHome) {
 
 	dbs.subscribersHomeMu.Lock()
 	delete(dbs.subscribersHome, s)
 	dbs.subscribersHomeMu.Unlock()
+}
+
+func (dbs *dbServer) deleteSubscriberGas(s *subscriberGas) {
+	dbs.subscribersGasMu.Lock()
+	delete(dbs.subscribersGas, s)
+	dbs.subscribersGasMu.Unlock()
 }
 
 // deleteSubscriber deletes the given subscriber.

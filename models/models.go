@@ -96,9 +96,39 @@ type Bid struct {
 	Price        BigInt `json:"price"`
 }
 
+type Block struct {
+	BlockNumber   BigInt  `json:"blockNumber"`
+	Timestamp     BigInt  `json:"timestamp"`
+	BaseFee       BigInt  `json:"baseFee"`
+	IsConfirmed   bool    `json:"isConfirmed"`
+	TwelveMinTwap *BigInt `json:"twelveMinTwap"`
+	ThreeHourTwap *BigInt `json:"threeHourTwap"`
+	ThirtyDayTwap *BigInt `json:"thirtyDayTwap"`
+}
+
+type TwapWindowType string
+
+const (
+	TwapWindowTwelveMin TwapWindowType = "twelve_min"
+	TwapWindowThreeHour TwapWindowType = "three_hour"
+	TwapWindowThirtyDay TwapWindowType = "thirty_day"
+)
+
+type TwapState struct {
+	WindowType         TwapWindowType `json:"windowType"`
+	WeightedSum        BigInt         `json:"weightedSum"`
+	TotalSeconds       BigInt         `json:"totalSeconds"`
+	IsConfirmed        bool           `json:"isConfirmed"`
+	TwapValue          BigInt         `json:"twapValue"`
+	LastBlockNumber    BigInt         `json:"lastBlockNumber"`
+	LastBlockTimestamp BigInt         `json:"lastBlockTimestamp"`
+}
+
 func (Bid) IsAllowedPayload()                    {}
 func (VaultState) IsAllowedPayload()             {}
 func (LiquidityProviderState) IsAllowedPayload() {}
 func (OptionRound) IsAllowedPayload()            {}
 func (OptionBuyer) IsAllowedPayload()            {}
 func (QueuedLiquidity) IsAllowedPayload()        {}
+func (Block) IsAllowedPayload()                  {}
+func (TwapState) IsAllowedPayload()              {}

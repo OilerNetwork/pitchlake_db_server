@@ -142,7 +142,7 @@ func (db *DB) GetOptionRoundsByVaultAddress(vaultAddress string) ([]*models.Opti
 	return optionRounds, nil
 }
 func (db *DB) GetBlocks(startBlock, endBlock uint64) ([]models.Block, error) {
-	query := `SELECT block_number, timestamp, base_fee, is_confirmed, twelve_min_twap, three_hour_twap, thirty_day_twap FROM public."Blocks" WHERE block_number BETWEEN $1 AND $2`
+	query := `SELECT block_number, timestamp, basefee, is_confirmed, twelve_min_twap, three_hour_twap, thirty_day_twap FROM public."blocks" WHERE block_number BETWEEN $1 AND $2`
 	rows, err := db.Pool.Query(context.Background(), query, startBlock, endBlock)
 	if err != nil {
 		return nil, err

@@ -6,80 +6,10 @@ import (
 	"net/http"
 	"pitchlake-backend/db"
 	"pitchlake-backend/models"
-	"sync"
 )
 
 // dbServer enables broadcasting to a set of subscribers.
-type dbServer struct {
-	// subscriberMessageBuffer controls the max number
-	// of messages that can be queued for a subscriber
-	// before it is kicked.
-	//
-	// Defaults to 16.
-	subscriberMessageBuffer int
-	db                      *db.DB
 
-	// publishLimiter controls the rate limit applied to the publish endpoint.
-	//
-	// Defaults to one publish every 100ms with a burst of 8.
-
-	// logf controls where logs are sent.
-	// Defaults to log.Printf.
-	logf func(f string, v ...interface{})
-
-	// serveMux routes the various endpoints to the appropriate handler.
-	serveMux http.ServeMux
-
-	subscribersVaultMu sync.Mutex
-	subscribersVault   map[string][]*subscriberVault
-	subscribersHomeMu  sync.Mutex
-	subscribersHome    map[*subscriberHome]struct{}
-	subscribersGasMu   sync.Mutex
-	subscribersGas     map[*subscriberGas]struct{}
-	ctx                context.Context
-	cancel             context.CancelFunc
-}
-
-// subscriber represents a subscriber.
-// Messages are sent on the msgs channel and if the client
-// cannot keep up with the messages, closeSlow is called.
-type subscriberVault struct {
-	msgs         chan []byte
-	address      string
-	userType     string
-	vaultAddress string
-	closeSlow    func()
-}
-
-type subscriberHome struct {
-	msgs      chan []byte
-	closeSlow func()
-}
-type subscriberGas struct {
-	msgs      chan []byte
-	closeSlow func()
-}
-
-type subscriberMessage struct {
-	Address      string `json:"address"`
-	VaultAddress string `json:"vaultAddress"`
-	UserType     string `json:"userType"`
-	OptionRound  uint64 `json:"optionRound"`
-}
-
-type subscriberVaultRequest struct {
-	UpdatedField string `json:"updatedField"`
-	UpdatedValue string `json:"updatedValue"`
-}
-
-type BidData struct {
-	Operation string     `json:"operation"`
-	Bid       models.Bid `json:"bid"`
-}
-
-type AllowedPayload interface {
-	IsAllowedPayload() // Dummy method
-}
 type NotificationPayload[T AllowedPayload] struct {
 	Operation string `json:"operation"`
 	Type      string `json:"type"`
@@ -105,6 +35,7 @@ func NewDBServer(ctx context.Context) *dbServer {
 		logf:                    log.Printf,
 		subscribersVault:        make(map[string][]*subscriberVault),
 		subscribersHome:         make(map[*subscriberHome]struct{}),
+		subscribersGas:          make(map[*subscriberGas]struct{}),
 		db:                      db,
 		ctx:                     ctx,
 		cancel:                  cancel,

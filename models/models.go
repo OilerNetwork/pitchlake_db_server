@@ -99,11 +99,11 @@ type Bid struct {
 type Block struct {
 	BlockNumber   BigInt  `json:"blockNumber"`
 	Timestamp     BigInt  `json:"timestamp"`
-	BaseFee       BigInt  `json:"baseFee"`
+	BaseFee       string  `json:"baseFee"`
 	IsConfirmed   bool    `json:"isConfirmed"`
-	TwelveMinTwap *BigInt `json:"twelveMinTwap"`
-	ThreeHourTwap *BigInt `json:"threeHourTwap"`
-	ThirtyDayTwap *BigInt `json:"thirtyDayTwap"`
+	TwelveMinTwap *string `json:"twelveMinTwap"`
+	ThreeHourTwap *string `json:"threeHourTwap"`
+	ThirtyDayTwap *string `json:"thirtyDayTwap"`
 }
 
 type TwapWindowType string
@@ -116,10 +116,10 @@ const (
 
 type TwapState struct {
 	WindowType         TwapWindowType `json:"windowType"`
-	WeightedSum        BigInt         `json:"weightedSum"`
+	WeightedSum        string         `json:"weightedSum"`
 	TotalSeconds       BigInt         `json:"totalSeconds"`
 	IsConfirmed        bool           `json:"isConfirmed"`
-	TwapValue          BigInt         `json:"twapValue"`
+	TwapValue          string         `json:"twapValue"`
 	LastBlockNumber    BigInt         `json:"lastBlockNumber"`
 	LastBlockTimestamp BigInt         `json:"lastBlockTimestamp"`
 }

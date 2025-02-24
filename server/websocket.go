@@ -246,6 +246,7 @@ func (dbs *dbServer) subscribeGasData(ctx context.Context, w http.ResponseWriter
 	var c *websocket.Conn
 	var closed bool
 
+	log.Printf("Subscribing to gas data")
 	//allowedOrigin := os.Getenv("APP_URL")
 	// Accept the WebSocket connection
 	c2, err := websocket.Accept(w, r, &websocket.AcceptOptions{
@@ -259,8 +260,10 @@ func (dbs *dbServer) subscribeGasData(ctx context.Context, w http.ResponseWriter
 	// Read the first message to get the subscription data
 	_, msg, err := c2.Read(ctx)
 	if err != nil {
+		log.Printf("Error reading message: %v", err)
 		return err
 	}
+	log.Printf("Received message from client: %v", msg)
 
 	s := &subscriberGas{
 		msgs: make(chan []byte, dbs.subscriberMessageBuffer),
@@ -330,6 +333,7 @@ func (dbs *dbServer) subscribeGasData(ctx context.Context, w http.ResponseWriter
 				log.Printf("Error fetching blocks: %v", err)
 				break
 			}
+			log.Printf("Blocks: %v", blocks)
 			response := struct {
 				Blocks []models.Block `json:"blocks"`
 			}{

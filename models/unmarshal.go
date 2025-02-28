@@ -212,13 +212,13 @@ func (or *OptionRound) UnmarshalJSON(data []byte) error {
 func (b *Block) UnmarshalJSON(data []byte) error {
 	// Auxiliary struct to map JSON keys
 	aux := struct {
-		BlockNumber   BigInt  `json:"block_number"`
-		Timestamp     BigInt  `json:"timestamp"`
-		BaseFee       string  `json:"base_fee"`
-		IsConfirmed   bool    `json:"is_confirmed"`
-		TwelveMinTwap *string `json:"twelve_min_twap"`
-		ThreeHourTwap *string `json:"three_hour_twap"`
-		ThirtyDayTwap *string `json:"thirty_day_twap"`
+		BlockNumber   uint64 `json:"block_number"`
+		Timestamp     uint64 `json:"timestamp"`
+		BaseFee       string `json:"base_fee"`
+		IsConfirmed   bool   `json:"is_confirmed"`
+		TwelveMinTwap string `json:"twelve_min_twap"`
+		ThreeHourTwap string `json:"three_hour_twap"`
+		ThirtyDayTwap string `json:"thirty_day_twap"`
 	}{}
 
 	// Unmarshal into the auxiliary struct
@@ -246,8 +246,8 @@ func (t *TwapState) UnmarshalJSON(data []byte) error {
 		TotalSeconds       BigInt         `json:"total_seconds"`
 		IsConfirmed        bool           `json:"is_confirmed"`
 		TwapValue          string         `json:"twap_value"`
-		LastBlockNumber    BigInt         `json:"last_block_number"`
-		LastBlockTimestamp BigInt         `json:"last_block_timestamp"`
+		LastBlockNumber    uint64         `json:"last_block_number"`
+		LastBlockTimestamp uint64         `json:"last_block_timestamp"`
 	}{}
 
 	// Unmarshal into the auxiliary struct

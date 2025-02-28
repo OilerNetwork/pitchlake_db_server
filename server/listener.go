@@ -33,6 +33,16 @@ func (dbs *dbServer) listener() {
 		log.Fatal(err)
 	}
 
+	_, err = dbs.db.Conn.Exec(context.Background(), "LISTEN unconfirmed_insert")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = dbs.db.Conn.Exec(context.Background(), "LISTEN confirmed_insert")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	fmt.Println("Waiting for notifications...")
 
 	for {
@@ -44,8 +54,47 @@ func (dbs *dbServer) listener() {
 		//Process notification here
 		switch notification.Channel {
 
+		case "confirmed_insert":
+			fmt.Println("Received a confirmed insert")
+			var updatedData []models.Block
+			err := json.Unmarshal([]byte(notification.Payload), &updatedData)
+			if err != nil {
+				log.Printf("Error parsing confirmed_insert payload: %v", err)
+				return
+			}
+			response := NotificationPayloadGas{
+				Type:   "confirmedBlocks",
+				Blocks: updatedData,
+			}
+			jsonResponse, err := json.Marshal(response)
+			if err != nil {
+				log.Printf("Error parsing confirmed_insert payload: %v", err)
+				return
+			}
+			for sub := range dbs.subscribersGas {
+				sub.msgs <- []byte(jsonResponse)
+			}
+		case "unconfirmed_insert":
+			var updatedData models.Block
+			err := json.Unmarshal([]byte(notification.Payload), &updatedData)
+			if err != nil {
+				log.Printf("Error parsing unconfirmed_insert payload: %v", err)
+				return
+			}
+			response := NotificationPayloadGas{
+				Type:   "unconfirmedBlocks",
+				Blocks: []models.Block{updatedData},
+			}
+			jsonResponse, err := json.Marshal(response)
+			if err != nil {
+				log.Printf("Error parsing unconfirmed_insert payload: %v", err)
+				return
+			}
+			for sub := range dbs.subscribersGas {
+				sub.msgs <- []byte(jsonResponse)
+			}
 		case "bids_update":
-			var updatedData NotificationPayload[models.Bid]
+			var updatedData NotificationPayloadVault[models.Bid]
 			err := json.Unmarshal([]byte(notification.Payload), &updatedData)
 			if err != nil {
 				log.Printf("Error parsing ob_update payload: %v", err)
@@ -67,7 +116,7 @@ func (dbs *dbServer) listener() {
 
 			}
 		case "lp_update":
-			var updatedData NotificationPayload[models.LiquidityProviderState]
+			var updatedData NotificationPayloadVault[models.LiquidityProviderState]
 			err := json.Unmarshal([]byte(notification.Payload), &updatedData)
 			if err != nil {
 				log.Printf("Error parsing lp_update payload: %v", err)
@@ -86,7 +135,7 @@ func (dbs *dbServer) listener() {
 			}
 			fmt.Printf("Received an update on lp_row_update, %s", notification.Payload)
 		case "vault_update":
-			var updatedData NotificationPayload[models.VaultState]
+			var updatedData NotificationPayloadVault[models.VaultState]
 			err := json.Unmarshal([]byte(notification.Payload), &updatedData)
 			if err != nil {
 				log.Printf("Error parsing vault_update payload: %v", err)
@@ -103,7 +152,7 @@ func (dbs *dbServer) listener() {
 			}
 			fmt.Println("Received an update on vault_update")
 		case "ob_update":
-			var updatedData NotificationPayload[models.OptionBuyer]
+			var updatedData NotificationPayloadVault[models.OptionBuyer]
 			var newOptionBuyer models.OptionBuyer
 			err := json.Unmarshal([]byte(notification.Payload), &updatedData)
 			if err != nil {
@@ -123,12 +172,11 @@ func (dbs *dbServer) listener() {
 						s.msgs <- []byte(response)
 					}
 				}
-
 			}
 		case "or_update":
 			fmt.Println("Received an update on or_update")
 			// Parse the JSON payload
-			var updatedData NotificationPayload[models.OptionRound]
+			var updatedData NotificationPayloadVault[models.OptionRound]
 			err := json.Unmarshal([]byte(notification.Payload), &updatedData)
 			if err != nil {
 				log.Printf("Error parsing or_update payload: %v", err)

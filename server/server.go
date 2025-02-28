@@ -10,17 +10,27 @@ import (
 
 // dbServer enables broadcasting to a set of subscribers.
 
-type NotificationPayload[T AllowedPayload] struct {
+type NotificationPayloadGas struct {
+	Type   string         `json:"type"`
+	Blocks []models.Block `json:"blocks"`
+}
+
+type NotificationPayloadVault[T AllowedPayload] struct {
 	Operation string `json:"operation"`
 	Type      string `json:"type"`
 	Payload   T      `json:"payload"`
 }
-type InitialPayload struct {
+type InitialPayloadVault struct {
 	PayloadType            string                        `json:"payloadType"`
 	LiquidityProviderState models.LiquidityProviderState `json:"liquidityProviderState"`
 	OptionBuyerStates      []*models.OptionBuyer         `json:"optionBuyerStates"`
 	VaultState             models.VaultState             `json:"vaultState"`
 	OptionRoundStates      []*models.OptionRound         `json:"optionRoundStates"`
+}
+
+type InitialPayloadGas struct {
+	UnconfirmedBlocks []models.Block `json:"unconfirmedBlocks"`
+	ConfirmedBlocks   []models.Block `json:"confirmedBlocks"`
 }
 
 // newdbServer constructs a dbServer with the defaults.

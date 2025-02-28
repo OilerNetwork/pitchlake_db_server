@@ -141,15 +141,15 @@ func (db *DB) GetOptionRoundsByVaultAddress(vaultAddress string) ([]*models.Opti
 
 	return optionRounds, nil
 }
-func (db *DB) GetBlocks(startBlock, endBlock uint64) ([]models.Block, error) {
-	query := `SELECT block_number, timestamp, basefee, is_confirmed, twelve_min_twap, three_hour_twap, thirty_day_twap FROM public."blocks" WHERE block_number BETWEEN $1 AND $2`
-	rows, err := db.Pool.Query(context.Background(), query, startBlock, endBlock)
+func (db *DB) GetBlocks(startTimestamp, endTimestamp, roundDuration uint64) ([]models.Block, error) {
+	query := `SELECT block_number, timestamp, basefee, is_confirmed, twelve_min_twap,three_hour_twap,thirty_day_twap FROM public."blocks" WHERE timestamp BETWEEN $1 AND $2`
+
+	var blocks []models.Block
+	rows, err := db.Pool.Query(context.Background(), query, startTimestamp, endTimestamp)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-
-	var blocks []models.Block
 	for rows.Next() {
 		var block models.Block
 		err := rows.Scan(

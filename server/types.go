@@ -35,14 +35,24 @@ type subscriberVault struct {
 	vaultAddress string
 	closeSlow    func()
 }
+type BlockResponse struct {
+	BlockNumber uint64 `json:"blockNumber"`
+	Timestamp   uint64 `json:"timestamp"`
+	BaseFee     string `json:"baseFee"`
+	IsConfirmed bool   `json:"isConfirmed"`
+	Twap        string `json:"twap"`
+}
 
 type subscriberHome struct {
 	msgs      chan []byte
 	closeSlow func()
 }
 type subscriberGas struct {
-	msgs      chan []byte
-	closeSlow func()
+	StartTimestamp uint64
+	EndTimestamp   uint64
+	RoundDuration  uint64
+	msgs           chan []byte
+	closeSlow      func()
 }
 
 type subscriberMessage struct {
@@ -67,11 +77,13 @@ type AllowedPayload interface {
 }
 
 type subscriberGasMessage struct {
-	StartBlock uint64 `json:"startBlock"`
-	EndBlock   uint64 `json:"endBlock"`
+	StartTimestamp uint64 `json:"startTimestamp"`
+	EndTimestamp   uint64 `json:"endTimestamp"`
+	RoundDuration  uint64 `json:"roundDuration"`
 }
 
 type subscriberGasRequest struct {
-	StartBlock uint64 `json:"startBlock"`
-	EndBlock   uint64 `json:"endBlock"`
+	StartTimestamp uint64 `json:"startTimestamp"`
+	EndTimestamp   uint64 `json:"endTimestamp"`
+	RoundDuration  uint64 `json:"roundDuration"`
 }

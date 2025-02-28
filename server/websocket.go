@@ -10,8 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"pitchlake-backend/models"
-
 	"github.com/coder/websocket"
 )
 
@@ -70,7 +68,7 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 	defer c.CloseNow()
 
 	//Send initial payload here
-	var payload InitialPayload
+	var payload InitialPayloadVault
 
 	payload.PayloadType = "initial"
 	vaultState, err := dbs.db.GetVaultStateByID(s.vaultAddress)
@@ -124,7 +122,7 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 				log.Printf("Incorrect message format: %v", err)
 				break
 			}
-			var payload InitialPayload
+			var payload InitialPayloadVault
 			if request.UpdatedField == "address" {
 				s.address = request.UpdatedValue
 
@@ -258,15 +256,11 @@ func (dbs *dbServer) subscribeGasData(ctx context.Context, w http.ResponseWriter
 	defer c2.Close(websocket.StatusInternalError, "Internal server error")
 
 	// Read the first message to get the subscription data
-	_, msg, err := c2.Read(ctx)
-	if err != nil {
-		log.Printf("Error reading message: %v", err)
-		return err
-	}
-	log.Printf("Received message from client: %v", msg)
-
 	s := &subscriberGas{
-		msgs: make(chan []byte, dbs.subscriberMessageBuffer),
+		msgs:           make(chan []byte, dbs.subscriberMessageBuffer),
+		StartTimestamp: 0,
+		EndTimestamp:   0,
+		RoundDuration:  0,
 		closeSlow: func() {
 			mu.Lock()
 			defer mu.Unlock()
@@ -288,32 +282,6 @@ func (dbs *dbServer) subscribeGasData(ctx context.Context, w http.ResponseWriter
 	c = c2
 	mu.Unlock()
 	defer c.CloseNow()
-
-	var sm subscriberGasMessage
-	err = json.Unmarshal(msg, &sm)
-	if err != nil {
-		return err
-	}
-	log.Printf("Received message from client: %v", sm)
-
-	blocks, err := dbs.db.GetBlocks(sm.StartBlock, sm.EndBlock)
-	if err != nil {
-		return err
-	}
-	log.Printf("Blocks: %v", blocks)
-
-	response := struct {
-		Blocks []models.Block `json:"blocks"`
-	}{
-		Blocks: blocks,
-	}
-	jsonPayload, err := json.Marshal(response)
-	if err != nil {
-		return err
-	}
-
-	dbs.writeTimeout(ctx, time.Second*5, c, jsonPayload)
-
 	go func() {
 		for {
 			var request subscriberGasRequest
@@ -328,24 +296,56 @@ func (dbs *dbServer) subscribeGasData(ctx context.Context, w http.ResponseWriter
 				log.Printf("Incorrect message format: %v", err)
 				break
 			}
-			blocks, err := dbs.db.GetBlocks(request.StartBlock, request.EndBlock)
+			s.StartTimestamp = request.StartTimestamp
+			s.EndTimestamp = request.EndTimestamp
+			s.RoundDuration = request.RoundDuration
+			blocks, err := dbs.db.GetBlocks(request.StartTimestamp, request.EndTimestamp, request.RoundDuration)
 			if err != nil {
 				log.Printf("Error fetching blocks: %v", err)
 				break
 			}
-			log.Printf("Blocks: %v", blocks)
-			response := struct {
-				Blocks []models.Block `json:"blocks"`
-			}{
-				Blocks: blocks,
+			var confirmedBlocks, unconfirmedBlocks []BlockResponse
+			for _, block := range blocks {
+				var twap string
+				switch s.RoundDuration {
+				case 1080:
+					twap = block.TwelveMinTwap
+				case 3 * 60 * 60:
+					twap = block.ThreeHourTwap
+				case 24 * 30 * 60 * 60:
+					twap = block.ThirtyDayTwap
+				}
+				if block.IsConfirmed {
+					confirmedBlocks = append(confirmedBlocks, BlockResponse{
+						BlockNumber: block.BlockNumber,
+						Timestamp:   block.Timestamp,
+						BaseFee:     block.BaseFee,
+						IsConfirmed: block.IsConfirmed,
+						Twap:        twap,
+					})
+				} else {
+					unconfirmedBlocks = append(unconfirmedBlocks, BlockResponse{
+						BlockNumber: block.BlockNumber,
+						Timestamp:   block.Timestamp,
+						BaseFee:     block.BaseFee,
+						IsConfirmed: block.IsConfirmed,
+						Twap:        twap,
+					})
+				}
 			}
+			response := struct {
+				ConfirmedBlocks   []BlockResponse `json:"confirmedBlocks"`
+				UnconfirmedBlocks []BlockResponse `json:"unconfirmedBlocks"`
+			}{
+				ConfirmedBlocks:   confirmedBlocks,
+				UnconfirmedBlocks: unconfirmedBlocks,
+			}
+			log.Printf("Response: %v", response)
 			jsonPayload, err := json.Marshal(response)
 			if err != nil {
 				log.Printf("Incorrect response generated: %v", err)
 			}
 			s.msgs <- []byte(jsonPayload)
-			log.Printf("Client Info %v", s)
-			// Handle the received message here
 		}
 	}()
 	for {

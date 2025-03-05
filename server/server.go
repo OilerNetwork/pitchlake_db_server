@@ -6,85 +6,31 @@ import (
 	"net/http"
 	"pitchlake-backend/db"
 	"pitchlake-backend/models"
-	"sync"
 )
 
 // dbServer enables broadcasting to a set of subscribers.
-type dbServer struct {
-	// subscriberMessageBuffer controls the max number
-	// of messages that can be queued for a subscriber
-	// before it is kicked.
-	//
-	// Defaults to 16.
-	subscriberMessageBuffer int
-	db                      *db.DB
 
-	// publishLimiter controls the rate limit applied to the publish endpoint.
-	//
-	// Defaults to one publish every 100ms with a burst of 8.
-
-	// logf controls where logs are sent.
-	// Defaults to log.Printf.
-	logf func(f string, v ...interface{})
-
-	// serveMux routes the various endpoints to the appropriate handler.
-	serveMux http.ServeMux
-
-	subscribersVaultMu sync.Mutex
-	subscribersVault   map[string][]*subscriberVault
-	subscribersHomeMu  sync.Mutex
-	subscribersHome    map[*subscriberHome]struct{}
-	ctx                context.Context
-	cancel             context.CancelFunc
+type NotificationPayloadGas struct {
+	Type   string          `json:"type"`
+	Blocks []BlockResponse `json:"blocks"`
 }
 
-// subscriber represents a subscriber.
-// Messages are sent on the msgs channel and if the client
-// cannot keep up with the messages, closeSlow is called.
-type subscriberVault struct {
-	msgs         chan []byte
-	address      string
-	userType     string
-	vaultAddress string
-	closeSlow    func()
-}
-
-type subscriberHome struct {
-	msgs      chan []byte
-	closeSlow func()
-}
-
-type subscriberMessage struct {
-	Address      string `json:"address"`
-	VaultAddress string `json:"vaultAddress"`
-	UserType     string `json:"userType"`
-	OptionRound  uint64 `json:"optionRound"`
-}
-
-type subscriberVaultRequest struct {
-	UpdatedField string `json:"updatedField"`
-	UpdatedValue string `json:"updatedValue"`
-}
-
-type BidData struct {
-	Operation string     `json:"operation"`
-	Bid       models.Bid `json:"bid"`
-}
-
-type AllowedPayload interface {
-	IsAllowedPayload() // Dummy method
-}
-type NotificationPayload[T AllowedPayload] struct {
+type NotificationPayloadVault[T AllowedPayload] struct {
 	Operation string `json:"operation"`
 	Type      string `json:"type"`
 	Payload   T      `json:"payload"`
 }
-type InitialPayload struct {
+type InitialPayloadVault struct {
 	PayloadType            string                        `json:"payloadType"`
 	LiquidityProviderState models.LiquidityProviderState `json:"liquidityProviderState"`
 	OptionBuyerStates      []*models.OptionBuyer         `json:"optionBuyerStates"`
 	VaultState             models.VaultState             `json:"vaultState"`
 	OptionRoundStates      []*models.OptionRound         `json:"optionRoundStates"`
+}
+
+type InitialPayloadGas struct {
+	UnconfirmedBlocks []models.Block `json:"unconfirmedBlocks"`
+	ConfirmedBlocks   []models.Block `json:"confirmedBlocks"`
 }
 
 // newdbServer constructs a dbServer with the defaults.
@@ -99,6 +45,7 @@ func NewDBServer(ctx context.Context) *dbServer {
 		logf:                    log.Printf,
 		subscribersVault:        make(map[string][]*subscriberVault),
 		subscribersHome:         make(map[*subscriberHome]struct{}),
+		subscribersGas:          make(map[*subscriberGas]struct{}),
 		db:                      db,
 		ctx:                     ctx,
 		cancel:                  cancel,
@@ -107,6 +54,7 @@ func NewDBServer(ctx context.Context) *dbServer {
 	dbs.serveMux.HandleFunc("/subscribeHome", dbs.subscribeHomeHandler)
 	dbs.serveMux.HandleFunc("/subscribeVault", dbs.subscribeVaultHandler)
 	dbs.serveMux.HandleFunc("/health", dbs.healthCheckHandler)
+	dbs.serveMux.HandleFunc("/subscribeGas", dbs.subscribeGasDataHandler)
 	go dbs.listener()
 	return dbs
 }
@@ -136,11 +84,23 @@ func (dbs *dbServer) addSubscriberHome(s *subscriberHome) {
 	dbs.subscribersHomeMu.Unlock()
 }
 
+func (dbs *dbServer) addSubscriberGas(s *subscriberGas) {
+	dbs.subscribersGasMu.Lock()
+	dbs.subscribersGas[s] = struct{}{}
+	dbs.subscribersGasMu.Unlock()
+}
+
 func (dbs *dbServer) deleteSubscriberHome(s *subscriberHome) {
 
 	dbs.subscribersHomeMu.Lock()
 	delete(dbs.subscribersHome, s)
 	dbs.subscribersHomeMu.Unlock()
+}
+
+func (dbs *dbServer) deleteSubscriberGas(s *subscriberGas) {
+	dbs.subscribersGasMu.Lock()
+	delete(dbs.subscribersGas, s)
+	dbs.subscribersGasMu.Unlock()
 }
 
 // deleteSubscriber deletes the given subscriber.

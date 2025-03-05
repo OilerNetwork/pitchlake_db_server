@@ -8,6 +8,11 @@ import (
 	"pitchlake-backend/models"
 )
 
+type confirmedUpdate struct {
+	StartTimestamp uint64 `json:"start_timestamp"`
+	EndTimestamp   uint64 `json:"end_timestamp"`
+}
+
 func (dbs *dbServer) listener() {
 	_, err := dbs.db.Conn.Exec(context.Background(), "LISTEN lp_update")
 	if err != nil {
@@ -33,6 +38,16 @@ func (dbs *dbServer) listener() {
 		log.Fatal(err)
 	}
 
+	_, err = dbs.db.Conn.Exec(context.Background(), "LISTEN unconfirmed_insert")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = dbs.db.Conn.Exec(context.Background(), "LISTEN confirmed_insert")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	fmt.Println("Waiting for notifications...")
 
 	for {
@@ -44,8 +59,151 @@ func (dbs *dbServer) listener() {
 		//Process notification here
 		switch notification.Channel {
 
+		case "confirmed_insert":
+			fmt.Println("Received a confirmed insert")
+			var updatedData confirmedUpdate
+			err := json.Unmarshal([]byte(notification.Payload), &updatedData)
+			if err != nil {
+				log.Printf("Error parsing confirmed_insert payload: %v", err)
+				return
+			}
+			blocks, err := dbs.db.GetBlocks(updatedData.StartTimestamp, updatedData.EndTimestamp, 0)
+			if err != nil {
+				log.Printf("Error parsing confirmed_insert payload: %v", err)
+				return
+			}
+			log.Printf("Blocks: %v", blocks)
+
+			var twelveMinResponse, threeHourResponse, thirtyDayResponse []BlockResponse
+
+			for _, block := range blocks {
+				twelveMinResponse = append(twelveMinResponse, BlockResponse{
+					BlockNumber: block.BlockNumber,
+					Timestamp:   block.Timestamp,
+					BaseFee:     block.BaseFee,
+					IsConfirmed: block.IsConfirmed,
+					Twap:        block.TwelveMinTwap,
+				})
+				threeHourResponse = append(threeHourResponse, BlockResponse{
+					BlockNumber: block.BlockNumber,
+					Timestamp:   block.Timestamp,
+					BaseFee:     block.BaseFee,
+					IsConfirmed: block.IsConfirmed,
+					Twap:        block.ThreeHourTwap,
+				})
+				thirtyDayResponse = append(thirtyDayResponse, BlockResponse{
+					BlockNumber: block.BlockNumber,
+					Timestamp:   block.Timestamp,
+					BaseFee:     block.BaseFee,
+					IsConfirmed: block.IsConfirmed,
+					Twap:        block.ThirtyDayTwap,
+				})
+			}
+			responseTwelveMin := NotificationPayloadGas{
+				Type:   "confirmedBlocks",
+				Blocks: twelveMinResponse,
+			}
+			responseThreeHour := NotificationPayloadGas{
+				Type:   "confirmedBlocks",
+				Blocks: threeHourResponse,
+			}
+			responseThirtyDay := NotificationPayloadGas{
+				Type:   "confirmedBlocks",
+				Blocks: thirtyDayResponse,
+			}
+			jsonResponseTwelveMin, err := json.Marshal(responseTwelveMin)
+			if err != nil {
+				log.Printf("Error parsing confirmed_insert payload: %v", err)
+				return
+			}
+			jsonResponseThreeHour, err := json.Marshal(responseThreeHour)
+			if err != nil {
+				log.Printf("Error parsing confirmed_insert payload: %v", err)
+				return
+			}
+			jsonResponseThirtyDay, err := json.Marshal(responseThirtyDay)
+			if err != nil {
+				log.Printf("Error parsing confirmed_insert payload: %v", err)
+				return
+			}
+			for sub := range dbs.subscribersGas {
+				log.Print("Sending payload")
+				switch sub.RoundDuration {
+				case 1080:
+					sub.msgs <- []byte(jsonResponseTwelveMin)
+				case 13200:
+					sub.msgs <- []byte(jsonResponseThreeHour)
+				case 2631600:
+					sub.msgs <- []byte(jsonResponseThirtyDay)
+				}
+			}
+		case "unconfirmed_insert":
+			var updatedData models.Block
+			err := json.Unmarshal([]byte(notification.Payload), &updatedData)
+			if err != nil {
+				log.Printf("Error parsing unconfirmed_insert payload: %v", err)
+				return
+			}
+			twelveMinResponse := BlockResponse{
+				BlockNumber: updatedData.BlockNumber,
+				Timestamp:   updatedData.Timestamp,
+				BaseFee:     updatedData.BaseFee,
+				IsConfirmed: updatedData.IsConfirmed,
+				Twap:        updatedData.TwelveMinTwap,
+			}
+			threeHourResponse := BlockResponse{
+				BlockNumber: updatedData.BlockNumber,
+				Timestamp:   updatedData.Timestamp,
+				BaseFee:     updatedData.BaseFee,
+				IsConfirmed: updatedData.IsConfirmed,
+				Twap:        updatedData.ThreeHourTwap,
+			}
+			thirtyDayResponse := BlockResponse{
+				BlockNumber: updatedData.BlockNumber,
+				Timestamp:   updatedData.Timestamp,
+				BaseFee:     updatedData.BaseFee,
+				IsConfirmed: updatedData.IsConfirmed,
+				Twap:        updatedData.ThirtyDayTwap,
+			}
+			responseTwelveMin := NotificationPayloadGas{
+				Type:   "unconfirmedBlocks",
+				Blocks: []BlockResponse{twelveMinResponse},
+			}
+			responseThreeHour := NotificationPayloadGas{
+				Type:   "unconfirmedBlocks",
+				Blocks: []BlockResponse{threeHourResponse},
+			}
+			responseThirtyDay := NotificationPayloadGas{
+				Type:   "unconfirmedBlocks",
+				Blocks: []BlockResponse{thirtyDayResponse},
+			}
+			jsonResponseTwelveMin, err := json.Marshal(responseTwelveMin)
+			if err != nil {
+				log.Printf("Error parsing unconfirmed_insert payload: %v", err)
+				return
+			}
+			jsonResponseThreeHour, err := json.Marshal(responseThreeHour)
+			if err != nil {
+				log.Printf("Error parsing unconfirmed_insert payload: %v", err)
+				return
+			}
+			jsonResponseThirtyDay, err := json.Marshal(responseThirtyDay)
+			if err != nil {
+				log.Printf("Error parsing unconfirmed_insert payload: %v", err)
+				return
+			}
+			for sub := range dbs.subscribersGas {
+				switch sub.RoundDuration {
+				case 1080:
+					sub.msgs <- []byte(jsonResponseTwelveMin)
+				case 13200:
+					sub.msgs <- []byte(jsonResponseThreeHour)
+				case 2631600:
+					sub.msgs <- []byte(jsonResponseThirtyDay)
+				}
+			}
 		case "bids_update":
-			var updatedData NotificationPayload[models.Bid]
+			var updatedData NotificationPayloadVault[models.Bid]
 			err := json.Unmarshal([]byte(notification.Payload), &updatedData)
 			if err != nil {
 				log.Printf("Error parsing ob_update payload: %v", err)
@@ -67,7 +225,7 @@ func (dbs *dbServer) listener() {
 
 			}
 		case "lp_update":
-			var updatedData NotificationPayload[models.LiquidityProviderState]
+			var updatedData NotificationPayloadVault[models.LiquidityProviderState]
 			err := json.Unmarshal([]byte(notification.Payload), &updatedData)
 			if err != nil {
 				log.Printf("Error parsing lp_update payload: %v", err)
@@ -86,7 +244,7 @@ func (dbs *dbServer) listener() {
 			}
 			fmt.Printf("Received an update on lp_row_update, %s", notification.Payload)
 		case "vault_update":
-			var updatedData NotificationPayload[models.VaultState]
+			var updatedData NotificationPayloadVault[models.VaultState]
 			err := json.Unmarshal([]byte(notification.Payload), &updatedData)
 			if err != nil {
 				log.Printf("Error parsing vault_update payload: %v", err)
@@ -103,7 +261,7 @@ func (dbs *dbServer) listener() {
 			}
 			fmt.Println("Received an update on vault_update")
 		case "ob_update":
-			var updatedData NotificationPayload[models.OptionBuyer]
+			var updatedData NotificationPayloadVault[models.OptionBuyer]
 			var newOptionBuyer models.OptionBuyer
 			err := json.Unmarshal([]byte(notification.Payload), &updatedData)
 			if err != nil {
@@ -123,12 +281,11 @@ func (dbs *dbServer) listener() {
 						s.msgs <- []byte(response)
 					}
 				}
-
 			}
 		case "or_update":
 			fmt.Println("Received an update on or_update")
 			// Parse the JSON payload
-			var updatedData NotificationPayload[models.OptionRound]
+			var updatedData NotificationPayloadVault[models.OptionRound]
 			err := json.Unmarshal([]byte(notification.Payload), &updatedData)
 			if err != nil {
 				log.Printf("Error parsing or_update payload: %v", err)

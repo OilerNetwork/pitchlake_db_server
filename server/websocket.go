@@ -68,7 +68,7 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 	defer c.CloseNow()
 
 	//Send initial payload here
-	var payload InitialPayload
+	var payload InitialPayloadVault
 
 	payload.PayloadType = "initial"
 	vaultState, err := dbs.db.GetVaultStateByID(s.vaultAddress)
@@ -122,7 +122,7 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 				log.Printf("Incorrect message format: %v", err)
 				break
 			}
-			var payload InitialPayload
+			var payload InitialPayloadVault
 			if request.UpdatedField == "address" {
 				s.address = request.UpdatedValue
 
@@ -229,6 +229,145 @@ func (dbs *dbServer) subscribeHome(ctx context.Context, w http.ResponseWriter, r
 		select {
 		case msg := <-s.msgs:
 			//Loop to write update messages to client
+			err := dbs.writeTimeout(ctx, time.Second*5, c, msg)
+			if err != nil {
+				return err
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+func (dbs *dbServer) subscribeGasData(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+	var mu sync.Mutex
+	var c *websocket.Conn
+	var closed bool
+
+	log.Printf("Subscribing to gas data")
+
+	c2, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		InsecureSkipVerify: true,
+	})
+	if err != nil {
+		return err
+	}
+	defer c2.Close(websocket.StatusInternalError, "Internal server error")
+
+	// Create a context that we can cancel
+	readerCtx, cancelReader := context.WithCancel(ctx)
+	defer cancelReader()
+
+	s := &subscriberGas{
+		msgs:           make(chan []byte, dbs.subscriberMessageBuffer),
+		StartTimestamp: 0,
+		EndTimestamp:   0,
+		RoundDuration:  0,
+		closeSlow: func() {
+			mu.Lock()
+			defer mu.Unlock()
+			closed = true
+			if c != nil {
+				c.Close(websocket.StatusPolicyViolation, "connection too slow to keep up with messages")
+			}
+			cancelReader() // Cancel the reader goroutine
+		},
+	}
+
+	dbs.addSubscriberGas(s)
+	defer dbs.deleteSubscriberGas(s)
+
+	mu.Lock()
+	if closed {
+		mu.Unlock()
+		return net.ErrClosed
+	}
+	c = c2
+	mu.Unlock()
+
+	defer c.CloseNow()
+
+	// Create error channel to handle goroutine errors
+	errChan := make(chan error, 1)
+
+	go func() {
+		defer close(errChan)
+		for {
+			select {
+			case <-readerCtx.Done():
+				return
+			default:
+				var request subscriberGasRequest
+				_, msg, err := c.Read(ctx)
+				if err != nil {
+					log.Printf("Error reading message: %v", err)
+					errChan <- err
+					return
+				}
+				log.Printf("Received message from client: %s", msg)
+				err = json.Unmarshal(msg, &request)
+				if err != nil {
+					log.Printf("Incorrect message format: %v", err)
+					errChan <- err
+					return
+				}
+				s.StartTimestamp = request.StartTimestamp
+				s.EndTimestamp = request.EndTimestamp
+				s.RoundDuration = request.RoundDuration
+				blocks, err := dbs.db.GetBlocks(request.StartTimestamp, request.EndTimestamp, request.RoundDuration)
+				if err != nil {
+					log.Printf("Error fetching blocks: %v", err)
+					errChan <- err
+					return
+				}
+				var confirmedBlocks, unconfirmedBlocks []BlockResponse
+				for _, block := range blocks {
+					twap := block.ThreeHourTwap
+					if block.IsConfirmed {
+						confirmedBlocks = append(confirmedBlocks, BlockResponse{
+							BlockNumber: block.BlockNumber,
+							Timestamp:   block.Timestamp,
+							BaseFee:     block.BaseFee,
+							IsConfirmed: block.IsConfirmed,
+							Twap:        twap,
+						})
+					} else {
+						unconfirmedBlocks = append(unconfirmedBlocks, BlockResponse{
+							BlockNumber: block.BlockNumber,
+							Timestamp:   block.Timestamp,
+							BaseFee:     block.BaseFee,
+							IsConfirmed: block.IsConfirmed,
+							Twap:        twap,
+						})
+					}
+				}
+				response := struct {
+					ConfirmedBlocks   []BlockResponse `json:"confirmedBlocks"`
+					UnconfirmedBlocks []BlockResponse `json:"unconfirmedBlocks"`
+				}{
+					ConfirmedBlocks:   confirmedBlocks,
+					UnconfirmedBlocks: unconfirmedBlocks,
+				}
+				jsonPayload, err := json.Marshal(response)
+				if err != nil {
+					log.Printf("Incorrect response generated: %v", err)
+					errChan <- err
+					return
+				}
+				select {
+				case s.msgs <- []byte(jsonPayload):
+				case <-readerCtx.Done():
+					return
+				}
+			}
+		}
+	}()
+
+	for {
+		select {
+		case err := <-errChan:
+			return err
+		case msg := <-s.msgs:
 			err := dbs.writeTimeout(ctx, time.Second*5, c, msg)
 			if err != nil {
 				return err

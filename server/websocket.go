@@ -245,8 +245,7 @@ func (dbs *dbServer) subscribeGasData(ctx context.Context, w http.ResponseWriter
 	var closed bool
 
 	log.Printf("Subscribing to gas data")
-	//allowedOrigin := os.Getenv("APP_URL")
-	// Accept the WebSocket connection
+
 	c2, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		InsecureSkipVerify: true,
 	})
@@ -255,7 +254,10 @@ func (dbs *dbServer) subscribeGasData(ctx context.Context, w http.ResponseWriter
 	}
 	defer c2.Close(websocket.StatusInternalError, "Internal server error")
 
-	// Read the first message to get the subscription data
+	// Create a context that we can cancel
+	readerCtx, cancelReader := context.WithCancel(ctx)
+	defer cancelReader()
+
 	s := &subscriberGas{
 		msgs:           make(chan []byte, dbs.subscriberMessageBuffer),
 		StartTimestamp: 0,
@@ -268,6 +270,7 @@ func (dbs *dbServer) subscribeGasData(ctx context.Context, w http.ResponseWriter
 			if c != nil {
 				c.Close(websocket.StatusPolicyViolation, "connection too slow to keep up with messages")
 			}
+			cancelReader() // Cancel the reader goroutine
 		},
 	}
 
@@ -281,67 +284,89 @@ func (dbs *dbServer) subscribeGasData(ctx context.Context, w http.ResponseWriter
 	}
 	c = c2
 	mu.Unlock()
+
 	defer c.CloseNow()
+
+	// Create error channel to handle goroutine errors
+	errChan := make(chan error, 1)
+
 	go func() {
+		defer close(errChan)
 		for {
-			var request subscriberGasRequest
-			_, msg, err := c.Read(ctx)
-			if err != nil {
-				log.Printf("Error reading message: %v", err)
-				break
-			}
-			log.Printf("Received message from client: %s", msg)
-			err = json.Unmarshal(msg, &request)
-			if err != nil {
-				log.Printf("Incorrect message format: %v", err)
-				break
-			}
-			s.StartTimestamp = request.StartTimestamp
-			s.EndTimestamp = request.EndTimestamp
-			s.RoundDuration = request.RoundDuration
-			blocks, err := dbs.db.GetBlocks(request.StartTimestamp, request.EndTimestamp, request.RoundDuration)
-			if err != nil {
-				log.Printf("Error fetching blocks: %v", err)
-				break
-			}
-			var confirmedBlocks, unconfirmedBlocks []BlockResponse
-			for _, block := range blocks {
-				twap := block.ThreeHourTwap
-				if block.IsConfirmed {
-					confirmedBlocks = append(confirmedBlocks, BlockResponse{
-						BlockNumber: block.BlockNumber,
-						Timestamp:   block.Timestamp,
-						BaseFee:     block.BaseFee,
-						IsConfirmed: block.IsConfirmed,
-						Twap:        twap,
-					})
-				} else {
-					unconfirmedBlocks = append(unconfirmedBlocks, BlockResponse{
-						BlockNumber: block.BlockNumber,
-						Timestamp:   block.Timestamp,
-						BaseFee:     block.BaseFee,
-						IsConfirmed: block.IsConfirmed,
-						Twap:        twap,
-					})
+			select {
+			case <-readerCtx.Done():
+				return
+			default:
+				var request subscriberGasRequest
+				_, msg, err := c.Read(ctx)
+				if err != nil {
+					log.Printf("Error reading message: %v", err)
+					errChan <- err
+					return
+				}
+				log.Printf("Received message from client: %s", msg)
+				err = json.Unmarshal(msg, &request)
+				if err != nil {
+					log.Printf("Incorrect message format: %v", err)
+					errChan <- err
+					return
+				}
+				s.StartTimestamp = request.StartTimestamp
+				s.EndTimestamp = request.EndTimestamp
+				s.RoundDuration = request.RoundDuration
+				blocks, err := dbs.db.GetBlocks(request.StartTimestamp, request.EndTimestamp, request.RoundDuration)
+				if err != nil {
+					log.Printf("Error fetching blocks: %v", err)
+					errChan <- err
+					return
+				}
+				var confirmedBlocks, unconfirmedBlocks []BlockResponse
+				for _, block := range blocks {
+					twap := block.ThreeHourTwap
+					if block.IsConfirmed {
+						confirmedBlocks = append(confirmedBlocks, BlockResponse{
+							BlockNumber: block.BlockNumber,
+							Timestamp:   block.Timestamp,
+							BaseFee:     block.BaseFee,
+							IsConfirmed: block.IsConfirmed,
+							Twap:        twap,
+						})
+					} else {
+						unconfirmedBlocks = append(unconfirmedBlocks, BlockResponse{
+							BlockNumber: block.BlockNumber,
+							Timestamp:   block.Timestamp,
+							BaseFee:     block.BaseFee,
+							IsConfirmed: block.IsConfirmed,
+							Twap:        twap,
+						})
+					}
+				}
+				response := struct {
+					ConfirmedBlocks   []BlockResponse `json:"confirmedBlocks"`
+					UnconfirmedBlocks []BlockResponse `json:"unconfirmedBlocks"`
+				}{
+					ConfirmedBlocks:   confirmedBlocks,
+					UnconfirmedBlocks: unconfirmedBlocks,
+				}
+				jsonPayload, err := json.Marshal(response)
+				if err != nil {
+					log.Printf("Incorrect response generated: %v", err)
+					errChan <- err
+					return
+				}
+				select {
+				case s.msgs <- []byte(jsonPayload):
+				case <-readerCtx.Done():
+					return
 				}
 			}
-			response := struct {
-				ConfirmedBlocks   []BlockResponse `json:"confirmedBlocks"`
-				UnconfirmedBlocks []BlockResponse `json:"unconfirmedBlocks"`
-			}{
-				ConfirmedBlocks:   confirmedBlocks,
-				UnconfirmedBlocks: unconfirmedBlocks,
-			}
-			log.Printf("Response: %v", response)
-			jsonPayload, err := json.Marshal(response)
-			if err != nil {
-				log.Printf("Incorrect response generated: %v", err)
-			}
-			s.msgs <- []byte(jsonPayload)
 		}
 	}()
+
 	for {
 		select {
+		case err := <-errChan:
+			return err
 		case msg := <-s.msgs:
 			err := dbs.writeTimeout(ctx, time.Second*5, c, msg)
 			if err != nil {
@@ -351,7 +376,6 @@ func (dbs *dbServer) subscribeGasData(ctx context.Context, w http.ResponseWriter
 			return ctx.Err()
 		}
 	}
-
 }
 
 func (dbs *dbServer) writeTimeout(ctx context.Context, timeout time.Duration, c *websocket.Conn, msg []byte) error {

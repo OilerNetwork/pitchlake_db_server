@@ -39,10 +39,6 @@ func (b *BigInt) Scan(value interface{}) error {
 
 func (b *BigInt) scanString(s string) error {
 	s = strings.TrimSpace(s)
-	_, ok := b.Int.SetString(s, 10) // Parse as decimal
-	if !ok {
-		return fmt.Errorf("failed to scan BigInt: invalid value %q", s)
-	}
 	return b.validateUint256()
 }
 

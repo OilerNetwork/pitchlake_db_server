@@ -145,6 +145,7 @@ func (db *DB) GetBlocks(startTimestamp, endTimestamp, roundDuration uint64) ([]m
 	query := `SELECT block_number, timestamp, basefee, is_confirmed, twelve_min_twap,three_hour_twap,thirty_day_twap 
 	FROM public."blocks" 
 	WHERE timestamp BETWEEN $1 AND $2
+	AND block_number % 4 = 0
 	ORDER BY block_number ASC
 	`
 

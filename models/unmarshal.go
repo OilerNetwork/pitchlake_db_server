@@ -1,6 +1,10 @@
 package models
 
-import "encoding/json"
+import (
+	"bytes"
+	"encoding/json"
+	"log"
+)
 
 func (lps *LiquidityProviderState) UnmarshalJSON(data []byte) error {
 	// Auxiliary struct to map JSON keys
@@ -210,30 +214,32 @@ func (or *OptionRound) UnmarshalJSON(data []byte) error {
 }
 
 func (b *Block) UnmarshalJSON(data []byte) error {
-	// Auxiliary struct to map JSON keys
+	// Auxiliary struct to map JSON keys with numeric types
 	aux := struct {
-		BlockNumber   uint64 `json:"block_number"`
-		Timestamp     uint64 `json:"timestamp"`
-		BaseFee       string `json:"base_fee"`
-		IsConfirmed   bool   `json:"is_confirmed"`
-		TwelveMinTwap string `json:"twelve_min_twap"`
-		ThreeHourTwap string `json:"three_hour_twap"`
-		ThirtyDayTwap string `json:"thirty_day_twap"`
+		BlockNumber   uint64      `json:"block_number"`
+		Timestamp     uint64      `json:"timestamp"`
+		BaseFee       json.Number `json:"basefee"`
+		IsConfirmed   bool        `json:"is_confirmed"`
+		TwelveMinTwap json.Number `json:"twelve_min_twap"`
+		ThreeHourTwap json.Number `json:"three_hour_twap"`
+		ThirtyDayTwap json.Number `json:"thirty_day_twap"`
 	}{}
 
-	// Unmarshal into the auxiliary struct
-	if err := json.Unmarshal(data, &aux); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	if err := dec.Decode(&aux); err != nil {
+		log.Printf("Error unmarshalling block: %v", err)
 		return err
 	}
 
-	// Copy data from aux to the original struct
+	// Copy data from aux to the original struct, converting numbers to strings
 	b.BlockNumber = aux.BlockNumber
 	b.Timestamp = aux.Timestamp
-	b.BaseFee = aux.BaseFee
+	b.BaseFee = aux.BaseFee.String()
 	b.IsConfirmed = aux.IsConfirmed
-	b.TwelveMinTwap = aux.TwelveMinTwap
-	b.ThreeHourTwap = aux.ThreeHourTwap
-	b.ThirtyDayTwap = aux.ThirtyDayTwap
+	b.TwelveMinTwap = aux.TwelveMinTwap.String()
+	b.ThreeHourTwap = aux.ThreeHourTwap.String()
+	b.ThirtyDayTwap = aux.ThirtyDayTwap.String()
 
 	return nil
 }

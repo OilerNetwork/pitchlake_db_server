@@ -11,8 +11,8 @@ import (
 // dbServer enables broadcasting to a set of subscribers.
 
 type NotificationPayloadGas struct {
-	Type   string         `json:"type"`
-	Blocks []models.Block `json:"blocks"`
+	Type   string          `json:"type"`
+	Blocks []BlockResponse `json:"blocks"`
 }
 
 type NotificationPayloadVault[T AllowedPayload] struct {

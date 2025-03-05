@@ -306,7 +306,7 @@ func (dbs *dbServer) subscribeGasData(ctx context.Context, w http.ResponseWriter
 			}
 			var confirmedBlocks, unconfirmedBlocks []BlockResponse
 			for _, block := range blocks {
-				twap := block.TwelveMinTwap
+				twap := block.ThreeHourTwap
 				if block.IsConfirmed {
 					confirmedBlocks = append(confirmedBlocks, BlockResponse{
 						BlockNumber: block.BlockNumber,

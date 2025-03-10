@@ -129,7 +129,7 @@ func (dbs *dbServer) listener() {
 			for sub := range dbs.subscribersGas {
 				log.Print("Sending payload")
 				switch sub.RoundDuration {
-				case 1080:
+				case 960:
 					sub.msgs <- []byte(jsonResponseTwelveMin)
 				case 13200:
 					sub.msgs <- []byte(jsonResponseThreeHour)
@@ -194,7 +194,7 @@ func (dbs *dbServer) listener() {
 			}
 			for sub := range dbs.subscribersGas {
 				switch sub.RoundDuration {
-				case 1080:
+				case 960:
 					sub.msgs <- []byte(jsonResponseTwelveMin)
 				case 13200:
 					sub.msgs <- []byte(jsonResponseThreeHour)

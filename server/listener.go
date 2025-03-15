@@ -138,6 +138,7 @@ func (dbs *dbServer) listener() {
 				}
 			}
 		case "unconfirmed_insert":
+			log.Printf("Received an unconfirmed insert")
 			var updatedData models.Block
 			err := json.Unmarshal([]byte(notification.Payload), &updatedData)
 			if err != nil {

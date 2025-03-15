@@ -144,12 +144,15 @@ func (db *DB) GetOptionRoundsByVaultAddress(vaultAddress string) ([]*models.Opti
 func (db *DB) GetBlocks(startTimestamp, endTimestamp, roundDuration uint64) ([]models.Block, error) {
 
 	var samplingRate uint64
-	if roundDuration == 960 {
+	switch roundDuration {
+	case 960:
 		samplingRate = 4
-	} else if roundDuration == 13200 {
+	case 13200:
 		samplingRate = 5
-	} else if roundDuration == 2631600 {
+	case 2631600:
 		samplingRate = 40
+	default:
+		samplingRate = 1
 	}
 	query := `SELECT block_number, timestamp, basefee, is_confirmed, twelve_min_twap,three_hour_twap,thirty_day_twap 
 	FROM public."blocks" 

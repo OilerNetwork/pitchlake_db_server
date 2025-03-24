@@ -49,7 +49,7 @@ func (db *DB) GetVaultStateByID(id string) (*models.VaultState, error) {
 	defer cancel()
 
 	var vaultState models.VaultState
-	query := `SELECT current_round, current_round_address, unlocked_balance, locked_balance, stashed_balance, address, latest_block, deployment_date, fossil_client_address, eth_address, option_round_class_hash, alpha, strike_level, auction_duration, round_duration, round_transition_period FROM public."VaultStates" WHERE address=$1`
+	query := `SELECT current_round, current_round_address, unlocked_balance, locked_balance, stashed_balance, address, latest_block, deployment_date, l1_data_processor_address, eth_address, option_round_class_hash, alpha, strike_level, auction_duration, round_duration, round_transition_period FROM public."VaultStates" WHERE address=$1`
 
 	err := db.Pool.QueryRow(ctx, query, id).Scan(
 		&vaultState.CurrentRound,
@@ -60,7 +60,7 @@ func (db *DB) GetVaultStateByID(id string) (*models.VaultState, error) {
 		&vaultState.Address,
 		&vaultState.LatestBlock,
 		&vaultState.DeploymentDate,
-		&vaultState.FossilClientAddress,
+		&vaultState.L1DataProcessorAddress,
 		&vaultState.EthAddress,
 		&vaultState.OptionRoundClassHash,
 		&vaultState.Alpha,
@@ -86,16 +86,16 @@ func (db *DB) GetOptionRoundsByVaultAddress(vaultAddress string) ([]*models.Opti
 	var optionRounds []*models.OptionRound
 	query :=
 		`
-	SELECT 
-    address, vault_address, round_id, cap_level, start_date, end_date, settlement_date, 
-    starting_liquidity, queued_liquidity,remaining_liquidity, unsold_liquidity, available_options, reserve_price, 
-    settlement_price, strike_price, sold_options, clearing_price, state, 
+	SELECT
+    address, vault_address, round_id, cap_level, start_date, end_date, settlement_date,
+    starting_liquidity, queued_liquidity,remaining_liquidity, unsold_liquidity, available_options, reserve_price,
+    settlement_price, strike_price, sold_options, clearing_price, state,
     premiums, payout_per_option, deployment_date
-	FROM 
-		public."Option_Rounds" 
-	WHERE 
-		vault_address = $1 
-	ORDER BY 
+	FROM
+		public."Option_Rounds"
+	WHERE
+		vault_address = $1
+	ORDER BY
 		round_id ASC;`
 
 	rows, err := db.Pool.Query(context.Background(), query, vaultAddress)
@@ -154,8 +154,8 @@ func (db *DB) GetBlocks(startTimestamp, endTimestamp, roundDuration uint64) ([]m
 	default:
 		samplingRate = 1
 	}
-	query := `SELECT block_number, timestamp, basefee, is_confirmed, twelve_min_twap,three_hour_twap,thirty_day_twap 
-	FROM public."blocks" 
+	query := `SELECT block_number, timestamp, basefee, is_confirmed, twelve_min_twap,three_hour_twap,thirty_day_twap
+	FROM public."blocks"
 	WHERE timestamp BETWEEN $1 AND $2
 	AND block_number % $3 = 0
 	ORDER BY block_number ASC
@@ -260,7 +260,7 @@ func (db *DB) GetVaultAddresses() ([]string, error) {
 	var vaultAddresses []string
 
 	query := `
-	SELECT address 
+	SELECT address
 	FROM "VaultStates" ;`
 
 	rows, err := db.Pool.Query(context.Background(), query)
@@ -306,7 +306,7 @@ func (db *DB) GetLiquidityProviderStateByAddress(address, vaultAddress string) (
 // GetOptionBuyerByID retrieves an OptionBuyer record by its Address
 func (db *DB) GetOptionBuyerByAddress(address string) ([]*models.OptionBuyer, error) {
 	var optionBuyers []*models.OptionBuyer
-	query := `SELECT address, round_address, mintable_options, refundable_amount, has_minted, has_refunded 
+	query := `SELECT address, round_address, mintable_options, refundable_amount, has_minted, has_refunded
 	          FROM public."Option_Buyers" WHERE address=$1`
 
 	rows, err := db.Pool.Query(context.Background(), query, address)
@@ -334,7 +334,7 @@ func (db *DB) GetOptionBuyerByAddress(address string) ([]*models.OptionBuyer, er
 		}
 
 		// Fetch associated bids for this optionBuyer
-		bidQuery := `SELECT buyer_address, round_address, bid_id, tree_nonce, amount, price 
+		bidQuery := `SELECT buyer_address, round_address, bid_id, tree_nonce, amount, price
 		             FROM public."Bids" WHERE buyer_address=$1 AND round_address=$2`
 		bidRows, err := db.Pool.Query(context.Background(), bidQuery, optionBuyer.Address, optionBuyer.RoundAddress)
 

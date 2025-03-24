@@ -35,22 +35,22 @@ func (lps *LiquidityProviderState) UnmarshalJSON(data []byte) error {
 func (vs *VaultState) UnmarshalJSON(data []byte) error {
 	// Auxiliary struct to map JSON keys
 	aux := struct {
-		CurrentRound          BigInt `json:"current_round"`
-		CurrentRoundAddress   string `json:"current_round_address"`
-		UnlockedBalance       BigInt `json:"unlocked_balance"`
-		LockedBalance         BigInt `json:"locked_balance"`
-		StashedBalance        BigInt `json:"stashed_balance"`
-		Address               string `json:"address"`
-		LatestBlock           BigInt `json:"latest_block"`
-		DeploymentDate        uint64 `json:"deployment_date"`
-		FossilClientAddress   string `json:"fossil_client_address"`
-		EthAddress            string `json:"eth_address"`
-		OptionRoundClassHash  string `json:"option_round_class_hash"`
-		Alpha                 BigInt `json:"alpha"`
-		StrikeLevel           BigInt `json:"strike_level"`
-		AuctionRunTime        uint64 `json:"auction_duration"`
-		OptionRunTime         uint64 `json:"round_duration"`
-		RoundTransitionPeriod uint64 `json:"round_transition_period"`
+		CurrentRound           BigInt `json:"current_round"`
+		CurrentRoundAddress    string `json:"current_round_address"`
+		UnlockedBalance        BigInt `json:"unlocked_balance"`
+		LockedBalance          BigInt `json:"locked_balance"`
+		StashedBalance         BigInt `json:"stashed_balance"`
+		Address                string `json:"address"`
+		LatestBlock            BigInt `json:"latest_block"`
+		DeploymentDate         uint64 `json:"deployment_date"`
+		L1DataProcessorAddress string `json:"l1_data_processor_address"`
+		EthAddress             string `json:"eth_address"`
+		OptionRoundClassHash   string `json:"option_round_class_hash"`
+		Alpha                  BigInt `json:"alpha"`
+		StrikeLevel            BigInt `json:"strike_level"`
+		AuctionRunTime         uint64 `json:"auction_duration"`
+		OptionRunTime          uint64 `json:"round_duration"`
+		RoundTransitionPeriod  uint64 `json:"round_transition_period"`
 	}{}
 
 	// Unmarshal into the auxiliary struct
@@ -67,7 +67,7 @@ func (vs *VaultState) UnmarshalJSON(data []byte) error {
 	vs.Address = aux.Address
 	vs.LatestBlock = aux.LatestBlock
 	vs.DeploymentDate = aux.DeploymentDate
-	vs.FossilClientAddress = aux.FossilClientAddress
+	vs.L1DataProcessorAddress = aux.L1DataProcessorAddress
 	vs.EthAddress = aux.EthAddress
 	vs.OptionRoundClassHash = aux.OptionRoundClassHash
 	vs.Alpha = aux.Alpha

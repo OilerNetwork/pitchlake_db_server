@@ -54,22 +54,22 @@ type OptionRound struct {
 }
 
 type VaultState struct {
-	CurrentRound          BigInt `json:"currentRoundId"`
-	CurrentRoundAddress   string `json:"currentRoundAddress"`
-	UnlockedBalance       BigInt `json:"unlockedBalance"`
-	LockedBalance         BigInt `json:"lockedBalance"`
-	StashedBalance        BigInt `json:"stashedBalance"`
-	Address               string `json:"address"`
-	LatestBlock           BigInt `json:"latestBlock"`
-	DeploymentDate        uint64 `json:"deploymentDate"`
-	FossilClientAddress   string `json:"fossilClientAddress"`
-	EthAddress            string `json:"ethAddress"`
-	OptionRoundClassHash  string `json:"optionRoundClassHash"`
-	Alpha                 BigInt `json:"alpha"`
-	StrikeLevel           BigInt `json:"strikeLevel"`
-	AuctionRunTime        uint64 `json:"auctionRunTime"`
-	OptionRunTime         uint64 `json:"optionRunTime"`
-	RoundTransitionPeriod uint64 `json:"roundTransitionPeriod"`
+	CurrentRound           BigInt `json:"currentRoundId"`
+	CurrentRoundAddress    string `json:"currentRoundAddress"`
+	UnlockedBalance        BigInt `json:"unlockedBalance"`
+	LockedBalance          BigInt `json:"lockedBalance"`
+	StashedBalance         BigInt `json:"stashedBalance"`
+	Address                string `json:"address"`
+	LatestBlock            BigInt `json:"latestBlock"`
+	DeploymentDate         uint64 `json:"deploymentDate"`
+	L1DataProcessorAddress string `json:"l1DataProcessorAddress"`
+	EthAddress             string `json:"ethAddress"`
+	OptionRoundClassHash   string `json:"optionRoundClassHash"`
+	Alpha                  BigInt `json:"alpha"`
+	StrikeLevel            BigInt `json:"strikeLevel"`
+	AuctionRunTime         uint64 `json:"auctionRunTime"`
+	OptionRunTime          uint64 `json:"optionRunTime"`
+	RoundTransitionPeriod  uint64 `json:"roundTransitionPeriod"`
 }
 
 type LiquidityProviderState struct {

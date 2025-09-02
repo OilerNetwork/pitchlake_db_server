@@ -39,6 +39,13 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 	if err != nil {
 		return err
 	}
+
+	// Validate subscription message
+	if err := validateSubscriptionMessage(sm); err != nil {
+		log.Printf("Invalid subscription message: %v", err)
+		return err
+	}
+
 	log.Printf("%v", sm)
 
 	s := &subscriberVault{
@@ -122,6 +129,13 @@ func (dbs *dbServer) subscribeVault(ctx context.Context, w http.ResponseWriter, 
 				log.Printf("Incorrect message format: %v", err)
 				break
 			}
+
+			// Validate vault request
+			if err := validateVaultRequest(request); err != nil {
+				log.Printf("Invalid vault request: %v", err)
+				break
+			}
+
 			var payload InitialPayloadVault
 			if request.UpdatedField == "address" {
 				s.address = request.UpdatedValue
@@ -311,6 +325,14 @@ func (dbs *dbServer) subscribeGasData(ctx context.Context, w http.ResponseWriter
 					errChan <- err
 					return
 				}
+
+				// Validate gas request
+				if err := validateGasRequest(request); err != nil {
+					log.Printf("Invalid gas request: %v", err)
+					errChan <- err
+					return
+				}
+
 				s.StartTimestamp = request.StartTimestamp
 				s.EndTimestamp = request.EndTimestamp
 				s.RoundDuration = request.RoundDuration

@@ -50,7 +50,6 @@ func NewDBServer(ctx context.Context) *dbServer {
 		ctx:                     ctx,
 		cancel:                  cancel,
 	}
-	dbs.serveMux.Handle("/", http.FileServer(http.Dir(".")))
 	dbs.serveMux.HandleFunc("/subscribeHome", dbs.subscribeHomeHandler)
 	dbs.serveMux.HandleFunc("/subscribeVault", dbs.subscribeVaultHandler)
 	dbs.serveMux.HandleFunc("/health", dbs.healthCheckHandler)

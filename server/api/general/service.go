@@ -73,7 +73,7 @@ func (router *GeneralRouter) subscribeGasData(ctx context.Context, w http.Respon
 			case <-readerCtx.Done():
 				return
 			default:
-				var request subscriberGasRequest
+				var request types.SubscriberGasRequest
 				_, msg, err := c.Read(ctx)
 				if err != nil {
 					log.Printf("Error reading message: %v", err)

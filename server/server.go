@@ -15,7 +15,7 @@ import (
 type dbServer struct {
 	subscriberMessageBuffer int
 	db                      *db.DB
-	logf                    func(f string, v ...interface{})
+	log                     log.Logger
 	serveMux                http.ServeMux
 	ctx                     context.Context
 	cancel                  context.CancelFunc
@@ -31,14 +31,14 @@ func NewDBServer(ctx context.Context) *dbServer {
 		log.Fatal("Failed to load db")
 	}
 	dbs := &dbServer{
-		logf:   log.Printf,
+		log:    *log.Default(),
 		db:     db,
 		ctx:    ctx,
 		cancel: cancel,
 	}
-	homeRouter := home.NewHomeRouter(&dbs.serveMux)
-	vaultRouter := vault.NewVaultRouter(&dbs.serveMux)
-	generalRouter := general.NewGeneralRouter(&dbs.serveMux)
+	homeRouter := home.NewHomeRouter(&dbs.serveMux, &dbs.log)
+	vaultRouter := vault.NewVaultRouter(&dbs.serveMux, &dbs.log)
+	generalRouter := general.NewGeneralRouter(&dbs.serveMux, &dbs.log)
 	go dbs.listener(ctx, vaultRouter.Subscribers.List, homeRouter.Subscribers.List, generalRouter.Subscribers.List)
 	return dbs
 }

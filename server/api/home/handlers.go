@@ -3,7 +3,10 @@ package home
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
+
+	"pitchlake-backend/server/types"
 
 	"github.com/coder/websocket"
 )
@@ -24,8 +27,13 @@ func (router *HomeRouter) subscribeHomeHandler(w http.ResponseWriter, r *http.Re
 	}
 }
 
-func NewHomeRouter(serveMux *http.ServeMux) *HomeRouter {
-	router := &HomeRouter{}
+func NewHomeRouter(serveMux *http.ServeMux, logger *log.Logger) *HomeRouter {
+	router := &HomeRouter{
+		Subscribers: SubscribersWithLock{
+			List: make(map[*types.SubscriberHome]struct{}),
+		},
+		log: logger,
+	}
 	serveMux.HandleFunc("/subscribeHome", router.subscribeHomeHandler)
 	return router
 }

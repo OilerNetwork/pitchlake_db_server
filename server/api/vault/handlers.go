@@ -3,7 +3,10 @@ package vault
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
+
+	"pitchlake-backend/server/types"
 
 	"github.com/coder/websocket"
 )
@@ -23,8 +26,13 @@ func (router *VaultRouter) subscribeVaultHandler(w http.ResponseWriter, r *http.
 	}
 }
 
-func NewVaultRouter(serveMux *http.ServeMux) *VaultRouter {
-	router := &VaultRouter{}
+func NewVaultRouter(serveMux *http.ServeMux, logger *log.Logger) *VaultRouter {
+	router := &VaultRouter{
+		Subscribers: SubscribersWithLock{
+			List: make(map[string][]*types.SubscriberVault),
+		},
+		log: logger,
+	}
 	serveMux.HandleFunc("/subscribeVault", router.subscribeVaultHandler)
 	return router
 }

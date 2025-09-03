@@ -128,7 +128,7 @@ func (router *VaultRouter) subscribeVault(ctx context.Context, w http.ResponseWr
 	utils.WriteTimeout(ctx, time.Second*5, c, jsonPayload)
 	go func() {
 		for {
-			var request subscriberVaultRequest
+			var request types.SubscriberVaultRequest
 			_, msg, err := c.Read(ctx)
 			if err != nil {
 				log.Printf("Error reading message: %v", err)

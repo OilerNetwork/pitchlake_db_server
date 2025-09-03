@@ -3,7 +3,10 @@ package general
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
+
+	"pitchlake-backend/server/types"
 
 	"github.com/coder/websocket"
 )
@@ -28,8 +31,13 @@ func (router *GeneralRouter) healthCheckHandler(w http.ResponseWriter, r *http.R
 	w.Write([]byte("OK"))
 }
 
-func NewGeneralRouter(serveMux *http.ServeMux) *GeneralRouter {
-	router := &GeneralRouter{}
+func NewGeneralRouter(serveMux *http.ServeMux, logger *log.Logger) *GeneralRouter {
+	router := &GeneralRouter{
+		Subscribers: SubscribersWithLock{
+			List: make(map[*types.SubscriberGas]struct{}),
+		},
+		log: logger,
+	}
 	serveMux.HandleFunc("/health", router.healthCheckHandler)
 	serveMux.HandleFunc("/subscribeGas", router.subscribeGasDataHandler)
 	return router

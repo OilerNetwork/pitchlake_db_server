@@ -5,32 +5,20 @@ import (
 	"log"
 	"net/http"
 	"pitchlake-backend/db"
-	"pitchlake-backend/models"
+	"pitchlake-backend/server/api/general"
+	"pitchlake-backend/server/api/home"
+	"pitchlake-backend/server/api/vault"
 )
 
 // dbServer enables broadcasting to a set of subscribers.
 
-type NotificationPayloadGas struct {
-	Type   string          `json:"type"`
-	Blocks []BlockResponse `json:"blocks"`
-}
-
-type NotificationPayloadVault[T AllowedPayload] struct {
-	Operation string `json:"operation"`
-	Type      string `json:"type"`
-	Payload   T      `json:"payload"`
-}
-type InitialPayloadVault struct {
-	PayloadType            string                        `json:"payloadType"`
-	LiquidityProviderState models.LiquidityProviderState `json:"liquidityProviderState"`
-	OptionBuyerStates      []*models.OptionBuyer         `json:"optionBuyerStates"`
-	VaultState             models.VaultState             `json:"vaultState"`
-	OptionRoundStates      []*models.OptionRound         `json:"optionRoundStates"`
-}
-
-type InitialPayloadGas struct {
-	UnconfirmedBlocks []models.Block `json:"unconfirmedBlocks"`
-	ConfirmedBlocks   []models.Block `json:"confirmedBlocks"`
+type dbServer struct {
+	subscriberMessageBuffer int
+	db                      *db.DB
+	log                     log.Logger
+	serveMux                http.ServeMux
+	ctx                     context.Context
+	cancel                  context.CancelFunc
 }
 
 // newdbServer constructs a dbServer with the defaults.
@@ -38,94 +26,23 @@ type InitialPayloadGas struct {
 func NewDBServer(ctx context.Context) *dbServer {
 
 	ctx, cancel := context.WithCancel(ctx)
-	db := &db.DB{}
-	db.Init()
-	dbs := &dbServer{
-		subscriberMessageBuffer: 16,
-		logf:                    log.Printf,
-		subscribersVault:        make(map[string][]*subscriberVault),
-		subscribersHome:         make(map[*subscriberHome]struct{}),
-		subscribersGas:          make(map[*subscriberGas]struct{}),
-		db:                      db,
-		ctx:                     ctx,
-		cancel:                  cancel,
+	db, err := db.NewDB()
+	if err != nil {
+		log.Fatal("Failed to load db")
 	}
-	dbs.serveMux.Handle("/", http.FileServer(http.Dir(".")))
-	dbs.serveMux.HandleFunc("/subscribeHome", dbs.subscribeHomeHandler)
-	dbs.serveMux.HandleFunc("/subscribeVault", dbs.subscribeVaultHandler)
-	dbs.serveMux.HandleFunc("/health", dbs.healthCheckHandler)
-	dbs.serveMux.HandleFunc("/subscribeGas", dbs.subscribeGasDataHandler)
-	go dbs.listener()
+	dbs := &dbServer{
+		log:    *log.Default(),
+		db:     db,
+		ctx:    ctx,
+		cancel: cancel,
+	}
+	homeRouter := home.NewHomeRouter(&dbs.serveMux, &dbs.log)
+	vaultRouter := vault.NewVaultRouter(&dbs.serveMux, &dbs.log)
+	generalRouter := general.NewGeneralRouter(&dbs.serveMux, &dbs.log)
+	go dbs.listener(ctx, vaultRouter.Subscribers.List, homeRouter.Subscribers.List, generalRouter.Subscribers.List)
 	return dbs
 }
 
 func (dbs *dbServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	dbs.serveMux.ServeHTTP(w, r)
-}
-
-// addSubscriber registers a subscriber.
-func (dbs *dbServer) addSubscriberVault(s *subscriberVault) {
-
-	dbs.subscribersVaultMu.Lock()
-	defer dbs.subscribersVaultMu.Unlock()
-
-	// Initialize the slice if it doesn't exist
-	if _, exists := dbs.subscribersVault[s.vaultAddress]; !exists {
-		dbs.subscribersVault[s.vaultAddress] = make([]*subscriberVault, 0)
-	}
-
-	dbs.subscribersVault[s.vaultAddress] = append(dbs.subscribersVault[s.vaultAddress], s)
-
-}
-func (dbs *dbServer) addSubscriberHome(s *subscriberHome) {
-
-	dbs.subscribersHomeMu.Lock()
-	dbs.subscribersHome[s] = struct{}{}
-	dbs.subscribersHomeMu.Unlock()
-}
-
-func (dbs *dbServer) addSubscriberGas(s *subscriberGas) {
-	dbs.subscribersGasMu.Lock()
-	dbs.subscribersGas[s] = struct{}{}
-	dbs.subscribersGasMu.Unlock()
-}
-
-func (dbs *dbServer) deleteSubscriberHome(s *subscriberHome) {
-
-	dbs.subscribersHomeMu.Lock()
-	delete(dbs.subscribersHome, s)
-	dbs.subscribersHomeMu.Unlock()
-}
-
-func (dbs *dbServer) deleteSubscriberGas(s *subscriberGas) {
-	dbs.subscribersGasMu.Lock()
-	delete(dbs.subscribersGas, s)
-	dbs.subscribersGasMu.Unlock()
-}
-
-// deleteSubscriber deletes the given subscriber.
-func (dbs *dbServer) deleteSubscriberVault(s *subscriberVault) {
-
-	dbs.subscribersVaultMu.Lock()
-	defer dbs.subscribersVaultMu.Unlock()
-
-	subscribers, exists := dbs.subscribersVault[s.vaultAddress]
-	if !exists {
-		return // Nothing to delete
-	}
-
-	for i, subscriber := range subscribers {
-		if subscriber == s {
-			// Replace the element to be deleted with the last element
-			subscribers[i] = subscribers[len(subscribers)-1]
-			// Truncate the slice
-			dbs.subscribersVault[s.vaultAddress] = subscribers[:len(subscribers)-1]
-			break
-		}
-	}
-
-	// If the slice is empty after deletion, remove the key from the map
-	if len(dbs.subscribersVault[s.vaultAddress]) == 0 {
-		delete(dbs.subscribersVault, s.vaultAddress)
-	}
 }

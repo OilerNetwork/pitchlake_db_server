@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"pitchlake-backend/db/repositories"
 	"pitchlake-backend/models"
+	"pitchlake-backend/server/types"
 )
 
 type confirmedUpdate struct {
@@ -13,7 +15,30 @@ type confirmedUpdate struct {
 	EndTimestamp   uint64 `json:"end_timestamp"`
 }
 
-func (dbs *dbServer) listener() {
+type NotificationPayloadGas struct {
+	Type   string                `json:"type"`
+	Blocks []types.BlockResponse `json:"blocks"`
+}
+
+type NotificationPayloadVault[T types.AllowedPayload] struct {
+	Operation string `json:"operation"`
+	Type      string `json:"type"`
+	Payload   T      `json:"payload"`
+}
+type InitialPayloadVault struct {
+	PayloadType            string                        `json:"payloadType"`
+	LiquidityProviderState models.LiquidityProviderState `json:"liquidityProviderState"`
+	OptionBuyerStates      []*models.OptionBuyer         `json:"optionBuyerStates"`
+	VaultState             models.VaultState             `json:"vaultState"`
+	OptionRoundStates      []*models.OptionRound         `json:"optionRoundStates"`
+}
+
+type InitialPayloadGas struct {
+	UnconfirmedBlocks []models.Block `json:"unconfirmedBlocks"`
+	ConfirmedBlocks   []models.Block `json:"confirmedBlocks"`
+}
+
+func (dbs *dbServer) listener(ctx context.Context, sv map[string][]*types.SubscriberVault, sh map[*types.SubscriberHome]struct{}, sg map[*types.SubscriberGas]struct{}) {
 	_, err := dbs.db.Conn.Exec(context.Background(), "LISTEN lp_update")
 	if err != nil {
 		log.Fatal(err)
@@ -67,31 +92,32 @@ func (dbs *dbServer) listener() {
 				log.Printf("Error parsing confirmed_insert payload: %v", err)
 				return
 			}
-			blocks, err := dbs.db.GetBlocks(updatedData.StartTimestamp, updatedData.EndTimestamp, 0)
+			blockRepo := repositories.NewBlockRepository(dbs.db.Pool)
+			blocks, err := blockRepo.GetBlocks(ctx, updatedData.StartTimestamp, updatedData.EndTimestamp, 0)
 			if err != nil {
 				log.Printf("Error parsing confirmed_insert payload: %v", err)
 				return
 			}
 			log.Printf("Blocks: %v", blocks)
 
-			var twelveMinResponse, threeHourResponse, thirtyDayResponse []BlockResponse
+			var twelveMinResponse, threeHourResponse, thirtyDayResponse []types.BlockResponse
 
 			for _, block := range blocks {
-				twelveMinResponse = append(twelveMinResponse, BlockResponse{
+				twelveMinResponse = append(twelveMinResponse, types.BlockResponse{
 					BlockNumber: block.BlockNumber,
 					Timestamp:   block.Timestamp,
 					BaseFee:     block.BaseFee,
 					IsConfirmed: block.IsConfirmed,
 					Twap:        block.TwelveMinTwap,
 				})
-				threeHourResponse = append(threeHourResponse, BlockResponse{
+				threeHourResponse = append(threeHourResponse, types.BlockResponse{
 					BlockNumber: block.BlockNumber,
 					Timestamp:   block.Timestamp,
 					BaseFee:     block.BaseFee,
 					IsConfirmed: block.IsConfirmed,
 					Twap:        block.ThreeHourTwap,
 				})
-				thirtyDayResponse = append(thirtyDayResponse, BlockResponse{
+				thirtyDayResponse = append(thirtyDayResponse, types.BlockResponse{
 					BlockNumber: block.BlockNumber,
 					Timestamp:   block.Timestamp,
 					BaseFee:     block.BaseFee,
@@ -126,15 +152,15 @@ func (dbs *dbServer) listener() {
 				log.Printf("Error parsing confirmed_insert payload: %v", err)
 				return
 			}
-			for sub := range dbs.subscribersGas {
+			for sub := range sg {
 				log.Print("Sending payload")
 				switch sub.RoundDuration {
 				case 960:
-					sub.msgs <- []byte(jsonResponseTwelveMin)
+					sub.Msgs <- []byte(jsonResponseTwelveMin)
 				case 13200:
-					sub.msgs <- []byte(jsonResponseThreeHour)
+					sub.Msgs <- []byte(jsonResponseThreeHour)
 				case 2631600:
-					sub.msgs <- []byte(jsonResponseThirtyDay)
+					sub.Msgs <- []byte(jsonResponseThirtyDay)
 				}
 			}
 		case "unconfirmed_insert":
@@ -145,21 +171,21 @@ func (dbs *dbServer) listener() {
 				log.Printf("Error parsing unconfirmed_insert payload: %v", err)
 				return
 			}
-			twelveMinResponse := BlockResponse{
+			twelveMinResponse := types.BlockResponse{
 				BlockNumber: updatedData.BlockNumber,
 				Timestamp:   updatedData.Timestamp,
 				BaseFee:     updatedData.BaseFee,
 				IsConfirmed: updatedData.IsConfirmed,
 				Twap:        updatedData.TwelveMinTwap,
 			}
-			threeHourResponse := BlockResponse{
+			threeHourResponse := types.BlockResponse{
 				BlockNumber: updatedData.BlockNumber,
 				Timestamp:   updatedData.Timestamp,
 				BaseFee:     updatedData.BaseFee,
 				IsConfirmed: updatedData.IsConfirmed,
 				Twap:        updatedData.ThreeHourTwap,
 			}
-			thirtyDayResponse := BlockResponse{
+			thirtyDayResponse := types.BlockResponse{
 				BlockNumber: updatedData.BlockNumber,
 				Timestamp:   updatedData.Timestamp,
 				BaseFee:     updatedData.BaseFee,
@@ -168,15 +194,15 @@ func (dbs *dbServer) listener() {
 			}
 			responseTwelveMin := NotificationPayloadGas{
 				Type:   "unconfirmedBlocks",
-				Blocks: []BlockResponse{twelveMinResponse},
+				Blocks: []types.BlockResponse{twelveMinResponse},
 			}
 			responseThreeHour := NotificationPayloadGas{
 				Type:   "unconfirmedBlocks",
-				Blocks: []BlockResponse{threeHourResponse},
+				Blocks: []types.BlockResponse{threeHourResponse},
 			}
 			responseThirtyDay := NotificationPayloadGas{
 				Type:   "unconfirmedBlocks",
-				Blocks: []BlockResponse{thirtyDayResponse},
+				Blocks: []types.BlockResponse{thirtyDayResponse},
 			}
 			jsonResponseTwelveMin, err := json.Marshal(responseTwelveMin)
 			if err != nil {
@@ -193,14 +219,14 @@ func (dbs *dbServer) listener() {
 				log.Printf("Error parsing unconfirmed_insert payload: %v", err)
 				return
 			}
-			for sub := range dbs.subscribersGas {
+			for sub := range sg {
 				switch sub.RoundDuration {
 				case 960:
-					sub.msgs <- []byte(jsonResponseTwelveMin)
+					sub.Msgs <- []byte(jsonResponseTwelveMin)
 				case 13200:
-					sub.msgs <- []byte(jsonResponseThreeHour)
+					sub.Msgs <- []byte(jsonResponseThreeHour)
 				case 2631600:
-					sub.msgs <- []byte(jsonResponseThirtyDay)
+					sub.Msgs <- []byte(jsonResponseThirtyDay)
 				}
 			}
 		case "bids_update":
@@ -217,10 +243,10 @@ func (dbs *dbServer) listener() {
 				log.Printf("Error parsing ob_update payload: %v", err)
 				return
 			}
-			for _, vaults := range dbs.subscribersVault {
+			for _, vaults := range sv {
 				for _, s := range vaults {
-					if s.address == updatedData.Payload.BuyerAddress {
-						s.msgs <- []byte(response)
+					if s.Address == updatedData.Payload.BuyerAddress {
+						s.Msgs <- []byte(response)
 					}
 				}
 
@@ -238,9 +264,9 @@ func (dbs *dbServer) listener() {
 				log.Printf("Error parsing lp_update payload: %v", err)
 				return
 			}
-			for _, lp := range dbs.subscribersVault[updatedData.Payload.VaultAddress] {
-				if lp.address == updatedData.Payload.Address {
-					lp.msgs <- []byte(response)
+			for _, lp := range sv[updatedData.Payload.VaultAddress] {
+				if lp.Address == updatedData.Payload.Address {
+					lp.Msgs <- []byte(response)
 				}
 			}
 			fmt.Printf("Received an update on lp_row_update, %s", notification.Payload)
@@ -257,8 +283,8 @@ func (dbs *dbServer) listener() {
 				log.Printf("Marshalling error %v", err)
 				return
 			}
-			for _, s := range dbs.subscribersVault[updatedData.Payload.Address] {
-				s.msgs <- []byte(response)
+			for _, s := range sv[updatedData.Payload.Address] {
+				s.Msgs <- []byte(response)
 			}
 			fmt.Println("Received an update on vault_update")
 		case "ob_update":
@@ -276,10 +302,10 @@ func (dbs *dbServer) listener() {
 				log.Printf("Error parsing ob_update payload: %v", err)
 				return
 			}
-			for _, vaults := range dbs.subscribersVault {
+			for _, vaults := range sv {
 				for _, s := range vaults {
-					if s.address == newOptionBuyer.Address && s.userType == "ob" {
-						s.msgs <- []byte(response)
+					if s.Address == newOptionBuyer.Address && s.UserType == "ob" {
+						s.Msgs <- []byte(response)
 					}
 				}
 			}
@@ -300,10 +326,10 @@ func (dbs *dbServer) listener() {
 			}
 			// Print the updated row
 			fmt.Printf("Updated OptionRound: %+v\n", updatedData.Payload.Address)
-			if dbs.subscribersVault[updatedData.Payload.VaultAddress] != nil {
+			if sv[updatedData.Payload.VaultAddress] != nil {
 
-				for _, s := range dbs.subscribersVault[updatedData.Payload.VaultAddress] {
-					s.msgs <- []byte(response)
+				for _, s := range sv[updatedData.Payload.VaultAddress] {
+					s.Msgs <- []byte(response)
 				}
 			}
 		}

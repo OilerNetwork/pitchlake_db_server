@@ -9,8 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"pitchlake-backend/betterdb/repositories"
-	"pitchlake-backend/server/ws/utils"
+	"pitchlake-backend/db/repositories"
+	"pitchlake-backend/server/api/utils"
+	"pitchlake-backend/server/types"
 
 	"github.com/coder/websocket"
 )
@@ -32,9 +33,9 @@ func (router *HomeRouter) SubscribeHome(ctx context.Context, w http.ResponseWrit
 
 	// Read the first message to get the subscription data
 
-	s := &subscriberHome{
-		msgs: make(chan []byte, router.subscriberMessageBuffer),
-		closeSlow: func() {
+	s := &types.SubscriberHome{
+		Msgs: make(chan []byte, router.subscriberMessageBuffer),
+		CloseSlow: func() {
 			mu.Lock()
 			defer mu.Unlock()
 			closed = true
@@ -79,7 +80,7 @@ func (router *HomeRouter) SubscribeHome(ctx context.Context, w http.ResponseWrit
 
 	for {
 		select {
-		case msg := <-s.msgs:
+		case msg := <-s.Msgs:
 			//Loop to write update messages to client
 			err := utils.WriteTimeout(ctx, time.Second*5, c, msg)
 			if err != nil {
@@ -91,16 +92,16 @@ func (router *HomeRouter) SubscribeHome(ctx context.Context, w http.ResponseWrit
 	}
 }
 
-func (router *HomeRouter) AddSubscriberHome(s *subscriberHome) {
+func (router *HomeRouter) AddSubscriberHome(s *types.SubscriberHome) {
 
-	router.subscribers.mux.Lock()
-	router.subscribers.list[s] = struct{}{}
-	router.subscribers.mux.Unlock()
+	router.Subscribers.mux.Lock()
+	router.Subscribers.List[s] = struct{}{}
+	router.Subscribers.mux.Unlock()
 }
 
-func (router *HomeRouter) DeleteSubscriberHome(s *subscriberHome) {
+func (router *HomeRouter) DeleteSubscriberHome(s *types.SubscriberHome) {
 
-	router.subscribers.mux.Lock()
-	delete(router.subscribers.list, s)
-	router.subscribers.mux.Unlock()
+	router.Subscribers.mux.Lock()
+	delete(router.Subscribers.List, s)
+	router.Subscribers.mux.Unlock()
 }

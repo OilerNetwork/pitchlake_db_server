@@ -3,18 +3,19 @@ package vault
 import (
 	"log"
 	"pitchlake-backend/models"
+	"pitchlake-backend/server/types"
 	"sync"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type SubscribersWithLock struct {
-	list map[string][]*subscriberVault
+	List map[string][]*types.SubscriberVault
 	mux  sync.Mutex
 }
 type VaultRouter struct {
 	subscriberMessageBuffer int
-	subscribers             SubscribersWithLock
+	Subscribers             SubscribersWithLock
 	log                     log.Logger
 	pool                    pgxpool.Pool
 }

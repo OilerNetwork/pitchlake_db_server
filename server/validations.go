@@ -2,11 +2,12 @@ package server
 
 import (
 	"fmt"
+	"pitchlake-backend/server/types"
 	"strings"
 )
 
 // validateSubscriptionMessage validates the incoming subscription message
-func validateSubscriptionMessage(sm subscriberMessage) error {
+func validateSubscriptionMessage(sm types.SubscriberMessage) error {
 	// Validate required fields
 	if sm.Address == "" {
 		return fmt.Errorf("address is required")
@@ -35,7 +36,7 @@ func validateSubscriptionMessage(sm subscriberMessage) error {
 }
 
 // validateGasRequest validates the gas data request
-func validateGasRequest(req subscriberGasRequest) error {
+func validateGasRequest(req types.SubscriberGasRequest) error {
 	// Validate timestamps
 	if req.StartTimestamp == 0 {
 		return fmt.Errorf("start timestamp is required")
@@ -57,7 +58,7 @@ func validateGasRequest(req subscriberGasRequest) error {
 }
 
 // validateVaultRequest validates vault update requests
-func validateVaultRequest(req subscriberVaultRequest) error {
+func validateVaultRequest(req types.SubscriberVaultRequest) error {
 	// Validate required fields
 	if req.UpdatedField == "" {
 		return fmt.Errorf("updated field is required")

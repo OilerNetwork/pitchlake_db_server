@@ -2,18 +2,19 @@ package home
 
 import (
 	"log"
+	"pitchlake-backend/server/types"
 	"sync"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type SubscribersWithLock struct {
-	list map[*subscriberHome]struct{}
+	List map[*types.SubscriberHome]struct{}
 	mux  sync.Mutex
 }
 type HomeRouter struct {
 	subscriberMessageBuffer int
-	subscribers             SubscribersWithLock
+	Subscribers             SubscribersWithLock
 	log                     log.Logger
 	pool                    pgxpool.Pool
 }

@@ -18,11 +18,6 @@ A high-performance WebSocket server built in Go for real-time blockchain data st
 ```bash
 # Build and run
 make build && make run
-
-# Run tests
-make test-unit    # Fast unit tests
-make test         # All tests
-make help         # See all commands
 ```
 
 ## 🏗️ Architecture

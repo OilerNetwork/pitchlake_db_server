@@ -13,6 +13,18 @@ A high-performance WebSocket server built in Go for real-time blockchain data st
 - **Health check endpoints** for monitoring
 - **Comprehensive test coverage** for all API components
 
+## ⚡ Quick Start
+
+```bash
+# Build and run
+make build && make run
+
+# Run tests
+make test-unit    # Fast unit tests
+make test         # All tests
+make help         # See all commands
+```
+
 ## 🏗️ Architecture
 
 The server follows a clean, modular architecture:
@@ -115,14 +127,78 @@ docker run -p 8080:8080 pitchlake-websocket
 
 ## 🧪 Testing
 
-The project includes comprehensive test coverage for all API components:
+The project includes comprehensive test coverage with both unit and integration tests. All testing commands are available via Makefile for easy development.
 
-### Run All Tests
+### Test Types
+
+#### **Unit Tests** (Fast, Isolated)
+- Test handlers, services, and validation functions
+- No external dependencies (no database, no WebSocket)
+- Include all API handler tests
+
+#### **Integration Tests** (Slower, WebSocket Dependent)
+- Test WebSocket validation flow end-to-end
+- Test real-world WebSocket communication
+
+### Test Commands
+
+#### **Run All Tests**
 ```bash
+# Using Makefile (recommended)
+make test
+
+# Raw Go command
 go test ./...
 ```
 
-### Run Tests by Package
+#### **Unit Tests Only** (Fast Development)
+```bash
+# Using Makefile (recommended)
+make test-unit
+
+# Raw Go command
+go test ./server/api/... ./server/validations/...
+```
+
+#### **Integration Tests Only**
+```bash
+# Using Makefile (recommended)
+make test-integration
+
+# Raw Go command
+go test ./server/...
+```
+
+#### **Test Coverage**
+```bash
+# Using Makefile (recommended)
+make test-coverage
+
+# Raw Go command
+go test -cover ./...
+
+# Coverage by specific package
+go test -cover ./server/validations/...
+go test -cover ./server/api/general/...
+go test -cover ./server/api/home/...
+go test -cover ./server/api/vault/...
+```
+
+#### **Advanced Test Commands**
+```bash
+# Verbose output (see individual test results)
+make test-verbose
+
+# Race detection (find concurrency issues)
+make test-race
+
+# Raw Go commands
+go test ./... -v          # Verbose
+go test ./... -race       # Race detection
+go test ./... -timeout 30s # With timeout
+```
+
+#### **Run Tests by Package**
 ```bash
 # General API tests
 go test ./server/api/general/...
@@ -132,11 +208,60 @@ go test ./server/api/home/...
 
 # Vault API tests
 go test ./server/api/vault/...
+
+# Validation tests only
+go test ./server/validations/...
 ```
 
-### Test Coverage
+### Test Structure
+```
+Unit Tests (Fast):
+├── server/api/general/     # Handler tests (6 test cases)
+├── server/api/home/        # Handler tests (6 test cases)  
+├── server/api/vault/       # Handler tests (6 test cases)
+└── server/validations/     # Validation tests (22 test cases)
+Total: 40 unit tests
+
+Integration Tests (Slower):
+└── server/integration_test.go  # WebSocket tests (4 test cases)
+```
+
+### Test Output Interpretation
+
+- **`ok`** - All tests passed
+- **`?`** - No test files in package (normal for some packages)
+- **`FAIL`** - Tests failed
+- **`SKIP`** - Tests skipped (common for integration tests in CI)
+
+### Development Workflow
 ```bash
-go test -cover ./...
+# 1. Run unit tests during development (fast)
+make test-unit
+
+# 2. Run all tests before commit
+make test
+
+# 3. Check coverage
+make test-coverage
+
+# 4. Run specific package tests during debugging
+go test ./server/api/general/... -v
+```
+
+### Advanced Test Commands
+```bash
+# Run tests with verbose output
+go test ./... -v
+
+# Run tests with race detection
+go test ./... -race
+
+# Run tests with timeout
+go test ./... -timeout 30s
+
+# Run tests and generate coverage profile
+go test ./... -coverprofile=coverage.out
+go tool cover -html=coverage.out
 ```
 
 ## 📊 Data Models

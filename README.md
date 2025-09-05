@@ -129,17 +129,6 @@ docker run -p 8080:8080 pitchlake-websocket
 
 The project includes comprehensive test coverage with both unit and integration tests. All testing commands are available via Makefile for easy development.
 
-### Test Types
-
-#### **Unit Tests** (Fast, Isolated)
-- Test handlers, services, and validation functions
-- No external dependencies (no database, no WebSocket)
-- Include all API handler tests
-
-#### **Integration Tests** (Slower, WebSocket Dependent)
-- Test WebSocket validation flow end-to-end
-- Test real-world WebSocket communication
-
 ### Test Commands
 
 #### **Run All Tests**
@@ -169,6 +158,12 @@ make test-integration
 go test ./server/...
 ```
 
+#### **Run Tests by Package**
+```bash
+# Vault API tests
+go test ./server/api/vault/...
+```
+
 #### **Test Coverage**
 ```bash
 # Using Makefile (recommended)
@@ -179,15 +174,6 @@ go test -cover ./...
 
 # Coverage by specific package
 go test -cover ./server/validations/...
-go test -cover ./server/api/general/...
-go test -cover ./server/api/home/...
-go test -cover ./server/api/vault/...
-```
-
-#### **Run Tests by Package**
-```bash
-# Vault API tests
-go test ./server/api/vault/...
 ```
 
 ### Test Structure
@@ -201,44 +187,6 @@ Total: 40 unit tests
 
 Integration Tests (Slower):
 └── server/integration_test.go  # WebSocket tests (4 test cases)
-```
-
-### Test Output Interpretation
-
-- **`ok`** - All tests passed
-- **`?`** - No test files in package (normal for some packages)
-- **`FAIL`** - Tests failed
-- **`SKIP`** - Tests skipped (common for integration tests in CI)
-
-### Development Workflow
-```bash
-# 1. Run unit tests during development (fast)
-make test-unit
-
-# 2. Run all tests before commit
-make test
-
-# 3. Check coverage
-make test-coverage
-
-# 4. Run specific package tests during debugging
-go test ./server/api/general/... -v
-```
-
-### Advanced Test Commands
-```bash
-# Run tests with verbose output
-go test ./... -v
-
-# Run tests with race detection
-go test ./... -race
-
-# Run tests with timeout
-go test ./... -timeout 30s
-
-# Run tests and generate coverage profile
-go test ./... -coverprofile=coverage.out
-go tool cover -html=coverage.out
 ```
 
 ## 📊 Data Models

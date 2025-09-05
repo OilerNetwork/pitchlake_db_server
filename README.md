@@ -184,33 +184,10 @@ go test -cover ./server/api/home/...
 go test -cover ./server/api/vault/...
 ```
 
-#### **Advanced Test Commands**
-```bash
-# Verbose output (see individual test results)
-make test-verbose
-
-# Race detection (find concurrency issues)
-make test-race
-
-# Raw Go commands
-go test ./... -v          # Verbose
-go test ./... -race       # Race detection
-go test ./... -timeout 30s # With timeout
-```
-
 #### **Run Tests by Package**
 ```bash
-# General API tests
-go test ./server/api/general/...
-
-# Home API tests  
-go test ./server/api/home/...
-
 # Vault API tests
 go test ./server/api/vault/...
-
-# Validation tests only
-go test ./server/validations/...
 ```
 
 ### Test Structure

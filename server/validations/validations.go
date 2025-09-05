@@ -1,4 +1,4 @@
-package server
+package validations
 
 import (
 	"fmt"
@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-// validateSubscriptionMessage validates the incoming subscription message
-func validateSubscriptionMessage(sm types.SubscriberMessage) error {
+// ValidateSubscriptionMessage validates the incoming subscription message
+func ValidateSubscriptionMessage(sm types.SubscriberMessage) error {
 	// Validate required fields
 	if sm.Address == "" {
 		return fmt.Errorf("address is required")
@@ -35,8 +35,8 @@ func validateSubscriptionMessage(sm types.SubscriberMessage) error {
 	return nil
 }
 
-// validateGasRequest validates the gas data request
-func validateGasRequest(req types.SubscriberGasRequest) error {
+// ValidateGasRequest validates the gas data request
+func ValidateGasRequest(req types.SubscriberGasRequest) error {
 	// Validate timestamps
 	if req.StartTimestamp == 0 {
 		return fmt.Errorf("start timestamp is required")
@@ -57,8 +57,8 @@ func validateGasRequest(req types.SubscriberGasRequest) error {
 	return nil
 }
 
-// validateVaultRequest validates vault update requests
-func validateVaultRequest(req types.SubscriberVaultRequest) error {
+// ValidateVaultRequest validates vault update requests
+func ValidateVaultRequest(req types.SubscriberVaultRequest) error {
 	// Validate required fields
 	if req.UpdatedField == "" {
 		return fmt.Errorf("updated field is required")

@@ -1,6 +1,6 @@
 # Pitchlake WebSocket Server - Development Commands
 
-.PHONY: help test test-unit test-integration test-coverage build run clean
+.PHONY: help test test-unit test-integration test-coverage test-verbose test-race build run clean
 
 # Default target
 help:
@@ -11,6 +11,8 @@ help:
 	@echo "  test-unit       Run unit tests only (fast)"
 	@echo "  test-integration Run integration tests only"
 	@echo "  test-coverage   Run tests with coverage report"
+	@echo "  test-verbose    Run tests with verbose output"
+	@echo "  test-race       Run tests with race detection"
 	@echo ""
 	@echo "Development:"
 	@echo "  build           Build the application"
@@ -34,6 +36,14 @@ test-integration:
 test-coverage:
 	@echo "Running tests with coverage..."
 	go test -cover ./...
+
+test-verbose:
+	@echo "Running tests with verbose output..."
+	go test ./... -v
+
+test-race:
+	@echo "Running tests with race detection..."
+	go test ./... -race
 
 # Development commands
 build:

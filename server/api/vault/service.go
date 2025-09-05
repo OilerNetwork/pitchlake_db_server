@@ -10,6 +10,7 @@ import (
 	"pitchlake-backend/db/repositories"
 	"pitchlake-backend/server/api/utils"
 	"pitchlake-backend/server/types"
+	"pitchlake-backend/server/validations"
 	"sync"
 	"time"
 
@@ -44,10 +45,17 @@ func (router *VaultRouter) subscribeVault(ctx context.Context, w http.ResponseWr
 	}
 
 	// Validate subscription message
-	// if err := validateSubscriptionMessage(sm); err != nil {
-	// 	log.Printf("Invalid subscription message: %v", err)
-	// 	return err
-	// }
+	if err := validations.ValidateSubscriptionMessage(sm); err != nil {
+		log.Printf("Invalid subscription message: %v", err)
+		// Send error response to client
+		errorResponse := map[string]string{
+			"error": "Invalid subscription message",
+			"details": err.Error(),
+		}
+		errorJson, _ := json.Marshal(errorResponse)
+		c2.Write(ctx, websocket.MessageText, errorJson)
+		return err
+	}
 
 	log.Printf("%v", sm)
 
@@ -142,10 +150,17 @@ func (router *VaultRouter) subscribeVault(ctx context.Context, w http.ResponseWr
 			}
 
 			// Validate vault request
-			// if err := validateVaultRequest(request); err != nil {
-			// 	log.Printf("Invalid vault request: %v", err)
-			// 	break
-			// }
+			if err := validations.ValidateVaultRequest(request); err != nil {
+				log.Printf("Invalid vault request: %v", err)
+				// Send error response to client
+				errorResponse := map[string]string{
+					"error": "Invalid vault request",
+					"details": err.Error(),
+				}
+				errorJson, _ := json.Marshal(errorResponse)
+				s.Msgs <- errorJson
+				break
+			}
 
 			var payload InitialPayloadVault
 			if request.UpdatedField == "address" {

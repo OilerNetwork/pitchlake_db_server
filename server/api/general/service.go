@@ -9,6 +9,7 @@ import (
 	"pitchlake-backend/db/repositories"
 	"pitchlake-backend/server/api/utils"
 	"pitchlake-backend/server/types"
+	"pitchlake-backend/server/validations"
 	"sync"
 	"time"
 
@@ -89,11 +90,18 @@ func (router *GeneralRouter) subscribeGasData(ctx context.Context, w http.Respon
 				}
 
 				// Validate gas request
-				// if err := validateGasRequest(request); err != nil {
-				// 	log.Printf("Invalid gas request: %v", err)
-				// 	errChan <- err
-				// 	return
-				// }
+				if err := validations.ValidateGasRequest(request); err != nil {
+					log.Printf("Invalid gas request: %v", err)
+					// Send error response to client
+					errorResponse := map[string]string{
+						"error": "Invalid request",
+						"details": err.Error(),
+					}
+					errorJson, _ := json.Marshal(errorResponse)
+					c.Write(ctx, websocket.MessageText, errorJson)
+					errChan <- err
+					return
+				}
 
 				s.StartTimestamp = request.StartTimestamp
 				s.EndTimestamp = request.EndTimestamp

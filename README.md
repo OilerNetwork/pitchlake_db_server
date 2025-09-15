@@ -13,6 +13,13 @@ A high-performance WebSocket server built in Go for real-time blockchain data st
 - **Health check endpoints** for monitoring
 - **Comprehensive test coverage** for all API components
 
+## ⚡ Quick Start
+
+```bash
+# Build and run
+make build && make run
+```
+
 ## 🏗️ Architecture
 
 The server follows a clean, modular architecture:
@@ -115,28 +122,66 @@ docker run -p 8080:8080 pitchlake-websocket
 
 ## 🧪 Testing
 
-The project includes comprehensive test coverage for all API components:
+The project includes comprehensive test coverage with both unit and integration tests. All testing commands are available via Makefile for easy development.
 
-### Run All Tests
+### Test Commands
+
+#### **Run All Tests**
 ```bash
+# Using Makefile (recommended)
+make test
+
+# Raw Go command
 go test ./...
 ```
 
-### Run Tests by Package
+#### **Unit Tests Only** (Fast Development)
 ```bash
-# General API tests
-go test ./server/api/general/...
+# Using Makefile (recommended)
+make test-unit
 
-# Home API tests  
-go test ./server/api/home/...
+# Raw Go command
+go test ./server/api/... ./server/validations/...
+```
 
+#### **Integration Tests Only**
+```bash
+# Using Makefile (recommended)
+make test-integration
+
+# Raw Go command
+go test ./server/...
+```
+
+#### **Run Tests by Package**
+```bash
 # Vault API tests
 go test ./server/api/vault/...
 ```
 
-### Test Coverage
+#### **Test Coverage**
 ```bash
+# Using Makefile (recommended)
+make test-coverage
+
+# Raw Go command
 go test -cover ./...
+
+# Coverage by specific package
+go test -cover ./server/validations/...
+```
+
+### Test Structure
+```
+Unit Tests (Fast):
+├── server/api/general/     # Handler tests (6 test cases)
+├── server/api/home/        # Handler tests (6 test cases)  
+├── server/api/vault/       # Handler tests (6 test cases)
+└── server/validations/     # Validation tests (22 test cases)
+Total: 40 unit tests
+
+Integration Tests (Slower):
+└── server/integration_test.go  # WebSocket tests (4 test cases)
 ```
 
 ## 📊 Data Models
